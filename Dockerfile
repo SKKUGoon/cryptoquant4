@@ -23,8 +23,7 @@ FROM alpine:latest
 
 WORKDIR /app
 
-# Ensure log directory exists
-RUN mkdir -p log && chown -R appuser:appuser log
+
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
@@ -34,6 +33,9 @@ COPY --from=builder /app/.env .
 
 # Create a non-root user
 RUN adduser -D -g '' appuser
+# Now it's safe to chown log directory
+RUN mkdir -p log && chown -R appuser:appuser log
+
 USER appuser
 
 # Expose port if needed
