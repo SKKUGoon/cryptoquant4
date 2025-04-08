@@ -28,6 +28,7 @@ func main() {
 	engine.StartAsset()
 	engine.StartMonitor()
 	engine.StartStrategy()
+	engine.StartTSLog()
 
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)

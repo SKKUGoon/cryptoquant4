@@ -33,6 +33,7 @@ type EngineContext struct {
 
 	// Data
 	Database         *database.Database
+	TimeScale        *database.TimeScale
 	FutureMarketData *binancesource.BinanceFutureMarketData
 
 	// Strategy
@@ -56,8 +57,9 @@ type EngineContext struct {
 	binanceBestAskChan chan float64
 	anchorBestAskChan  chan float64
 
-	// Logger
-	Logger *log.Logger
+	// logger
+	logger *log.Logger
+	tsLog  chan database.PremiumLog
 }
 
 func setupLog() *log.Logger {
@@ -91,6 +93,13 @@ func New(ctx context.Context) *EngineContext {
 		panic(err)
 	}
 
+	// Connect to TimeScale
+	ts, err := database.ConnectTS()
+	if err != nil {
+		logger.Printf("Failed to connect to TimeScale: %v", err)
+		panic(err)
+	}
+
 	// Create exchange configs
 	kimchiConfig, err := config.NewUpbitSpotTradeConfig()
 	if err != nil {
@@ -115,12 +124,23 @@ func New(ctx context.Context) *EngineContext {
 		KimchiExchangeConfig:  kimchiConfig,
 		BinanceExchangeConfig: binanceConfig,
 		Database:              db,
-		Logger:                logger,
+		TimeScale:             ts,
+		logger:                logger,
 		AnchorAssetSymbol:     anchor,
 
 		kimchiTradeChan:  make(chan float64),
 		binanceTradeChan: make(chan float64),
 		anchorTradeChan:  make(chan float64),
+
+		kimchiBestBidChan:  make(chan float64),
+		binanceBestBidChan: make(chan float64),
+		anchorBestBidChan:  make(chan float64),
+
+		kimchiBestAskChan:  make(chan float64),
+		binanceBestAskChan: make(chan float64),
+		anchorBestAskChan:  make(chan float64),
+
+		tsLog: make(chan database.PremiumLog),
 	}
 
 	logger.Printf("Engine initialized")
@@ -133,24 +153,24 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 	ksymbol := os.Getenv("UPBIT_SYMBOL")
 
 	if csymbol == "" || ksymbol == "" {
-		e.Logger.Printf("Failed to confirm target symbols: %v", "Environment variables not set")
+		e.logger.Printf("Failed to confirm target symbols: %v", "Environment variables not set")
 		panic("Environment variables not set")
 	}
 
 	// Confirm trading symbols in cefi and kimchi
 	if !e.BinanceExchangeConfig.IsAvailableSymbol(csymbol) {
-		e.Logger.Printf("Failed to confirm target symbols: %v", "Binance symbol not available")
+		e.logger.Printf("Failed to confirm target symbols: %v", "Binance symbol not available")
 		panic("Binance symbol not available")
 	}
 
 	if !e.KimchiExchangeConfig.IsAvailableSymbol(ksymbol) {
-		e.Logger.Printf("Failed to confirm target symbols: %v", "Kimchi symbol not available")
+		e.logger.Printf("Failed to confirm target symbols: %v", "Kimchi symbol not available")
 		panic("Kimchi symbol not available")
 	}
 
 	// Confirm anchor symbol
 	if !e.KimchiExchangeConfig.IsAvailableSymbol(e.AnchorAssetSymbol) {
-		e.Logger.Printf("Failed to confirm target symbols: %v", "Kimchi anchor symbol not available")
+		e.logger.Printf("Failed to confirm target symbols: %v", "Kimchi anchor symbol not available")
 		panic("Kimchi anchor symbol not available")
 	}
 
@@ -159,7 +179,7 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 }
 
 func (e *EngineContext) StartAsset() {
-	e.Logger.Printf("Starting asset for %v", e.KimchiAssetSymbol)
+	e.logger.Printf("Starting asset for %v", e.KimchiAssetSymbol)
 	kimchiAsset := kimchiarb.NewAsset(e.KimchiAssetSymbol)
 	binanceAsset := kimchiarb.NewAsset(e.CefiAssetSymbol)
 	anchorAsset := kimchiarb.NewAsset(e.AnchorAssetSymbol)
@@ -182,50 +202,78 @@ func (e *EngineContext) StartAsset() {
 		KimchiAsset: kimchiAsset,
 	}
 
-	e.Logger.Printf("Asset Pairs(%v, %v, %v) initialized", e.KimchiAssetSymbol, e.CefiAssetSymbol, e.AnchorAssetSymbol)
+	e.logger.Printf("Asset Pairs(%v, %v, %v) initialized", e.KimchiAssetSymbol, e.CefiAssetSymbol, e.AnchorAssetSymbol)
 }
 
 func (e *EngineContext) StartMonitor() {
-	e.Logger.Printf("Engine started")
+	e.logger.Printf("Engine started")
 
 	// Start stream
-	e.Logger.Printf("Starting stream for %v", e.KimchiAssetSymbol)
+	e.logger.Printf("Starting stream for %v", e.KimchiAssetSymbol)
 	h1 := upbitmarket.NewPriceHandler(e.kimchiTradeChan)
 	h1s := []func(upbitws.SpotTrade) error{h1}
 	go upbitmarket.SubscribeTrade(e.ctx, e.KimchiAssetSymbol, h1s)
 
 	// Start stream
-	e.Logger.Printf("Starting stream for %v", e.CefiAssetSymbol)
+	e.logger.Printf("Starting stream for %v", e.CefiAssetSymbol)
 	h2 := binancemarket.NewPriceHandler(e.binanceTradeChan)
 	h2s := []func(binancews.FutureAggTrade) error{h2}
 	go binancemarket.SubscribeAggtrade(e.ctx, e.CefiAssetSymbol, h2s)
 
 	// Start stream
-	e.Logger.Printf("Starting stream for %v", e.AnchorAssetSymbol)
+	e.logger.Printf("Starting stream for %v", e.AnchorAssetSymbol)
 	h3 := upbitmarket.NewPriceHandler(e.anchorTradeChan)
 	h3s := []func(upbitws.SpotTrade) error{h3}
 	go upbitmarket.SubscribeTrade(e.ctx, e.AnchorAssetSymbol, h3s)
 }
 
 func (e *EngineContext) StartStrategy() {
-	e.Logger.Printf("Starting strategy")
+	e.logger.Printf("Starting strategy")
 	go e.KimchiPairs.Run(e.ctx)
 
-	for {
-		select {
-		case <-e.ctx.Done():
-			return
-		case <-time.Tick(1 * time.Second):
-			e.Logger.Println(e.KimchiPairs.Status())
+	go func() {
+		for {
+			select {
+			case <-e.ctx.Done():
+				return
+			case <-time.Tick(100 * time.Millisecond):
+				e.logger.Println(e.KimchiPairs.Status())
+
+				log := e.KimchiPairs.ToPremiumLog()
+				e.tsLog <- log
+			}
 		}
-	}
+	}()
+}
+
+func (e *EngineContext) StartTSLog() {
+	e.logger.Printf("Starting DB log")
+	buffer := make([]database.PremiumLog, 0, 100) // Insert 100 at a time
+	go func() {
+		for {
+			select {
+			case <-e.ctx.Done():
+				return
+			case row := <-e.tsLog:
+				buffer = append(buffer, row)
+				if len(buffer) >= 100 {
+					if err := e.TimeScale.InsertPremiumLog(buffer); err != nil {
+						e.logger.Printf("Failed to insert premium log: %v", err)
+					} else {
+						e.logger.Printf("Inserted %v rows to TimeScale", len(buffer))
+					}
+					buffer = make([]database.PremiumLog, 0, 100)
+				}
+			}
+		}
+	}()
 }
 
 func (e *EngineContext) Stop() {
-	e.Logger.Printf("Engine stopping...")
+	e.logger.Printf("Engine stopping...")
 	e.cancel()
 	e.wg.Wait()
-	e.Logger.Printf("Engine stopped")
+	e.logger.Printf("Engine stopped")
 }
 
 func (e *EngineContext) Context() context.Context {
