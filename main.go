@@ -8,15 +8,15 @@ import (
 	"syscall"
 
 	"cryptoquant.com/m/engine"
-	"github.com/joho/godotenv"
 )
 
-func init() {
-	// Load environment variables
-	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-}
+// // For local development
+// func init() {
+// 	// Load environment variables
+// 	if err := godotenv.Load(".env"); err != nil {
+// 		log.Fatalf("Error loading .env file: %v", err)
+// 	}
+// }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())

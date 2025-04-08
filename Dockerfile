@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23.1-alpine AS builder
 
 WORKDIR /app
 
@@ -27,6 +27,8 @@ WORKDIR /app
 COPY --from=builder /app/main .
 # Copy the log directory
 COPY --from=builder /app/log ./log
+# Copy the .env file
+COPY --from=builder /app/.env .
 
 # Create a non-root user
 RUN adduser -D -g '' appuser

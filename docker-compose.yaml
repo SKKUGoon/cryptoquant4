@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -7,12 +5,17 @@ services:
       dockerfile: Dockerfile
     container_name: cryptoquant
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - USERNAME=${USERNAME}
       - PASSWORD=${PASSWORD}
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT}
       - PG_NAME=${PG_NAME}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME}
       - BINANCE_SYMBOL=${BINANCE_SYMBOL}
       - UPBIT_SYMBOL=${UPBIT_SYMBOL}
       - ANCHOR_SYMBOL=${ANCHOR_SYMBOL}

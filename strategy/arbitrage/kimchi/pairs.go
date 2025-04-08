@@ -68,8 +68,6 @@ func (p *KimchiPremium) ToPremiumLog() database.PremiumLog {
 }
 
 func (p *KimchiPremium) calculatePremium() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
 		return
 	}

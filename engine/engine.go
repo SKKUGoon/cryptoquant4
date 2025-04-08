@@ -237,7 +237,13 @@ func (e *EngineContext) StartStrategy() {
 			case <-e.ctx.Done():
 				return
 			case <-time.Tick(100 * time.Millisecond):
-				e.logger.Println(e.KimchiPairs.Status())
+				ok, msg := e.KimchiPairs.Status()
+				if !ok {
+					e.logger.Printf("Strategy is not ready: %v", msg)
+					continue
+				} else {
+					e.logger.Println(msg)
+				}
 
 				log := e.KimchiPairs.ToPremiumLog()
 				e.tsLog <- log
