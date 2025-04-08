@@ -23,6 +23,9 @@ FROM alpine:latest
 
 WORKDIR /app
 
+# Ensure log directory exists
+RUN mkdir -p log && chown -R appuser:appuser log
+
 # Copy the binary from builder
 COPY --from=builder /app/main .
 
