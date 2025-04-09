@@ -234,6 +234,10 @@ func (e *EngineContext) StartStrategy() {
 	e.logger.Printf("Starting strategy")
 	go e.KimchiPairs.Run(e.ctx)
 
+	// Track consecutive failures
+	consecutiveFailures := 0
+	const maxConsecutiveFailures = 5000 // Adjust this threshold as needed
+
 	go func() {
 		for {
 			select {
@@ -242,9 +246,20 @@ func (e *EngineContext) StartStrategy() {
 			case <-time.Tick(100 * time.Millisecond):
 				ok, msg := e.KimchiPairs.Status()
 				if !ok {
-					e.logger.Printf("Strategy is not ready: %v", msg)
+					consecutiveFailures++
+					e.logger.Printf("Strategy is not ready: %v (consecutive failures: %d)", msg, consecutiveFailures)
+
+					if consecutiveFailures >= maxConsecutiveFailures {
+						e.logger.Printf("Too many consecutive failures (%d), initiating container restart", consecutiveFailures)
+						// Trigger graceful shutdown
+						e.Stop()
+						// Exit with non-zero status to trigger container restart
+						os.Exit(1)
+					}
 					continue
 				} else {
+					// Reset failure counter on success
+					consecutiveFailures = 0
 					e.logger.Println(msg)
 				}
 

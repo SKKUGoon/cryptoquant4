@@ -25,6 +25,11 @@ services:
       - ./log/btc:/app/log
     networks:
       - shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   eth:
     build:
@@ -52,6 +57,11 @@ services:
       - ./log/eth:/app/log
     networks:
       - shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   cow:
     build:
@@ -79,6 +89,11 @@ services:
       - ./log/cow:/app/log
     networks:
       - shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   kava:
     build:
@@ -106,6 +121,11 @@ services:
       - ./log/kava:/app/log
     networks:
       - shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   shared:
