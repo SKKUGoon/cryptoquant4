@@ -1,9 +1,9 @@
 services:
-  app:
+  btc:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cryptoquant
+    container_name: cryptoquant_btc
     restart: unless-stopped
     env_file:
       - .env
@@ -16,18 +16,97 @@ services:
       - TS_HOST=${TS_HOST}
       - TS_PORT=${TS_PORT}
       - TS_NAME=${TS_NAME}
-      - BINANCE_SYMBOL=${BINANCE_SYMBOL}
-      - UPBIT_SYMBOL=${UPBIT_SYMBOL}
-      - ANCHOR_SYMBOL=${ANCHOR_SYMBOL}
+      - BINANCE_SYMBOL=BTCUSDT
+      - UPBIT_SYMBOL=KRW-BTC
+      - ANCHOR_SYMBOL=KRW-USDT
       - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
       - BINANCE_API_KEY=${BINANCE_API_KEY}
     volumes:
-      - ./log:/app/log
+      - ./log/btc:/app/log
     networks:
       - shared
-    # Uncomment if you need to expose ports
-    # ports:
-    #   - "8080:8080" 
+
+  eth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cryptoquant_eth
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_NAME=${PG_NAME}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME}
+      - BINANCE_SYMBOL=ETHUSDT
+      - UPBIT_SYMBOL=KRW-ETH
+      - ANCHOR_SYMBOL=KRW-USDT
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+    volumes:
+      - ./log/eth:/app/log
+    networks:
+      - shared
+
+  cow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cryptoquant_cow
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_NAME=${PG_NAME}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME}
+      - BINANCE_SYMBOL=COWUSDT
+      - UPBIT_SYMBOL=KRW-COW
+      - ANCHOR_SYMBOL=KRW-USDT
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+    volumes:
+      - ./log/cow:/app/log
+    networks:
+      - shared
+
+  kava:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cryptoquant_kava
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_NAME=${PG_NAME}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME}
+      - BINANCE_SYMBOL=KAVAUSDT
+      - UPBIT_SYMBOL=KRW-KAVA
+      - ANCHOR_SYMBOL=KRW-USDT
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+    volumes:
+      - ./log/kava:/app/log
+    networks:
+      - shared
+
 networks:
   shared:
     external: true
