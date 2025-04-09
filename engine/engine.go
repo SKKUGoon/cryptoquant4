@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -63,20 +64,22 @@ type EngineContext struct {
 }
 
 func setupLog() *log.Logger {
-	// Create log directory with today's date
-	today := time.Now().Format("20060102")
-	logDir := filepath.Join("log", today)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	// Ensure the log directory exists
+	if err := os.MkdirAll("log", 0755); err != nil {
 		panic(err)
 	}
 
-	// Open log file in dated directory
-	logPath := filepath.Join(logDir, "engine.log")
+	// Create a log file with today's date in the name
+	today := time.Now().Format("20060102")
+	logPath := filepath.Join("log", "engine_"+today+".log")
 	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
-	return log.New(logFile, "", log.LstdFlags)
+
+	// Create a logger that writes to the file and stdout
+	multiWriter := io.MultiWriter(logFile, os.Stdout)
+	return log.New(multiWriter, "", log.LstdFlags)
 }
 
 func New(ctx context.Context) *EngineContext {
@@ -263,11 +266,15 @@ func (e *EngineContext) StartTSLog() {
 			case row := <-e.tsLog:
 				buffer = append(buffer, row)
 				if len(buffer) >= 100 {
-					if err := e.TimeScale.InsertPremiumLog(buffer); err != nil {
-						e.logger.Printf("Failed to insert premium log: %v", err)
-					} else {
-						e.logger.Printf("Inserted %v rows to TimeScale", len(buffer))
-					}
+					bufferCopy := make([]database.PremiumLog, len(buffer))
+					copy(bufferCopy, buffer)
+					go func(logs []database.PremiumLog) {
+						if err := e.TimeScale.InsertPremiumLog(logs); err != nil {
+							e.logger.Printf("Failed to insert premium log: %v", err)
+						} else {
+							e.logger.Printf("Inserted %v rows to TimeScale", len(logs))
+						}
+					}(bufferCopy)
 					buffer = make([]database.PremiumLog, 0, 100)
 				}
 			}
