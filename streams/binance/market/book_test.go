@@ -15,8 +15,8 @@ func TestSubscribeBook(t *testing.T) {
 	ch2 := make(chan float64)
 	ch3 := make(chan float64)
 	ch4 := make(chan float64)
-	handler1 := binancemarket.NewBestBidPriceHandler(ch1)
-	handler2 := binancemarket.NewBestAskPriceHandler(ch2)
+	handler1 := binancemarket.NewBestBidPrcHandler(ch1)
+	handler2 := binancemarket.NewBestAskPrcHandler(ch2)
 	handler3 := binancemarket.NewBestBidQtyHandler(ch3)
 	handler4 := binancemarket.NewBestAskQtyHandler(ch4)
 	handlers := []func(binancews.FutureBookTicker) error{handler1, handler2, handler3, handler4}

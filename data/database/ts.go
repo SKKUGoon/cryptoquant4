@@ -12,17 +12,17 @@ type TimeScale struct {
 }
 
 type PremiumLog struct {
-	Timestamp   time.Time
-	Symbol      string
-	Premium     float64
-	KimchiPrice float64
-	AnchorPrice float64
-	CefiPrice   float64
+	Timestamp       time.Time
+	Symbol          string
+	Premium         float64
+	PremiumEnterPos float64
+	PremiumExitPos  float64
+	KimchiPrice     float64
+	AnchorPrice     float64
+	CefiPrice       float64
 	// Best Bid and Ask
 	KimchiBestBid float64
 	KimchiBestAsk float64
-	AnchorBestBid float64
-	AnchorBestAsk float64
 	CefiBestBid   float64
 	CefiBestAsk   float64
 }
@@ -84,8 +84,8 @@ func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
 			log.CefiPrice,
 			log.KimchiBestBid,
 			log.KimchiBestAsk,
-			log.AnchorBestBid,
-			log.AnchorBestAsk,
+			nil,
+			nil,
 			log.CefiBestBid,
 			log.CefiBestAsk,
 		)

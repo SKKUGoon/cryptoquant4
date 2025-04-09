@@ -93,11 +93,11 @@ func ExtractBestBidQty(book binancews.FutureBookTicker) string {
 	return book.BestBidQty
 }
 
-func NewBestAskPriceHandler(ch chan float64) func(binancews.FutureBookTicker) error {
+func NewBestAskPrcHandler(ch chan float64) func(binancews.FutureBookTicker) error {
 	return HandlerBook(ch, ExtractBestAskPrice, utils.StringToFloat64)
 }
 
-func NewBestBidPriceHandler(ch chan float64) func(binancews.FutureBookTicker) error {
+func NewBestBidPrcHandler(ch chan float64) func(binancews.FutureBookTicker) error {
 	return HandlerBook(ch, ExtractBestBidPrice, utils.StringToFloat64)
 }
 

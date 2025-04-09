@@ -9,6 +9,7 @@ type SubscriptionMessageTicket struct {
 type SubscriptionMessageType struct {
 	Type  string   `json:"type,omitempty"`
 	Codes []string `json:"codes,omitempty"`
+	Level int      `json:"level,omitempty"`
 }
 
 type SubscriptionMessageFormat struct {

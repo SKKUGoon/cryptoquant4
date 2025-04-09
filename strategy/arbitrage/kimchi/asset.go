@@ -9,9 +9,11 @@ type Asset struct {
 
 	Symbol string
 
-	priceChan chan float64
-	bestBid   chan float64
-	bestAsk   chan float64
+	priceChan      chan float64
+	bestBidPrcChan chan float64
+	bestBidQtyChan chan float64
+	bestAskPrcChan chan float64
+	bestAskQtyChan chan float64
 
 	pricePrecision    int
 	quantityPrecision int
@@ -29,16 +31,28 @@ func (a *Asset) SetPriceChannel(ch chan float64) {
 	a.priceChan = ch
 }
 
-func (a *Asset) SetBestBidChannel(ch chan float64) {
+func (a *Asset) SetBestBidPrcChannel(ch chan float64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.bestBid = ch
+	a.bestBidPrcChan = ch
 }
 
-func (a *Asset) SetBestAskChannel(ch chan float64) {
+func (a *Asset) SetBestBidQtyChannel(ch chan float64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.bestAsk = ch
+	a.bestBidQtyChan = ch
+}
+
+func (a *Asset) SetBestAskPrcChannel(ch chan float64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.bestAskPrcChan = ch
+}
+
+func (a *Asset) SetBestAskQtyChannel(ch chan float64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.bestAskQtyChan = ch
 }
 
 func (a *Asset) SetPricePrecision(precision int) {
@@ -69,6 +83,8 @@ func (a *Asset) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	close(a.priceChan)
-	close(a.bestBid)
-	close(a.bestAsk)
+	close(a.bestBidPrcChan)
+	close(a.bestBidQtyChan)
+	close(a.bestAskPrcChan)
+	close(a.bestAskQtyChan)
 }

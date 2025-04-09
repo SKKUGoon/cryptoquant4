@@ -12,15 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	maxRetries     = 5
-	initialBackoff = 1 * time.Second
-	maxBackoff     = 30 * time.Second
-	// Add random delay between 0-5 seconds for initial connection
-	maxInitialDelay = 5 * time.Second
-)
-
-func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.SpotTrade) error) error {
+func SubscribeBook(ctx context.Context, symbol string, handlers []func(upbitws.SpotOrderbook) error) error {
 	// Add random delay before initial connection attempt
 	initialDelay := time.Duration(rand.Int63n(int64(maxInitialDelay)))
 	log.Printf("Waiting %v before initial connection attempt for %s", initialDelay, symbol)
@@ -39,7 +31,6 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 	var err error
 	backoff := initialBackoff
 
-	// Retry connection with exponential backoff
 	for retry := range maxRetries {
 		if conn, _, err = websocket.DefaultDialer.Dial(url, nil); err == nil {
 			break
@@ -47,10 +38,8 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 
 		log.Printf("WebSocket connection attempt %d/%d failed: %v", retry+1, maxRetries, err)
 
-		// Calculate next backoff duration with exponential increase
 		backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
 
-		// Wait for backoff period or context cancellation
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -64,42 +53,37 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 	}
 	defer conn.Close()
 
-	log.Printf("Connected to Upbit trade stream for %s", symbol)
+	log.Printf("Connected to Upbit book stream for %s", symbol)
 
-	// Create subscription message with three segments
 	subscriptionMessage := upbitws.SubscriptionMessage{
 		upbitws.SubscriptionMessageTicket{
-			Ticket: "trade_subscription_" + time.Now().Format("20060102") + "_" + symbol,
+			Ticket: "book_subscription_" + time.Now().Format("20060102") + "_" + symbol,
 		},
 		upbitws.SubscriptionMessageType{
-			Type:  "trade",
+			Type:  "orderbook",
 			Codes: []string{symbol},
+			Level: 0,
 		},
 		upbitws.SubscriptionMessageFormat{
 			Format: "DEFAULT",
 		},
 	}
 
-	// Send subscription request
 	if err := conn.WriteJSON(subscriptionMessage); err != nil {
 		return fmt.Errorf("failed to send subscription message: %v", err)
 	}
 
-	// Create ping ticker
 	pingTicker := time.NewTicker(40 * time.Second)
 	defer pingTicker.Stop()
 
-	// Start ping loop in a separate goroutine
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-pingTicker.C:
-				// Send ping frame
 				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
 					log.Printf("Failed to send ping: %v", err)
-					// Closing conn will make ReadJSON fail → triggers reconnect in main loop
 					_ = conn.Close()
 					return
 				} else {
@@ -109,24 +93,23 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 		}
 	}()
 
-	// Read messages
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			var trade upbitws.SpotTrade
-			if err := conn.ReadJSON(&trade); err != nil {
+			var orderbook upbitws.SpotOrderbook
+			if err := conn.ReadJSON(&orderbook); err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("WebSocket closed unexpectedly: %v", err)
 					// Try to reconnect
-					return SubscribeTrade(ctx, symbol, handlers)
+					return SubscribeBook(ctx, symbol, handlers)
 				}
 				log.Printf("Error reading message: %v", err)
 				continue
 			}
 			for _, handler := range handlers {
-				if err := handler(trade); err != nil {
+				if err := handler(orderbook); err != nil {
 					return fmt.Errorf("handler error: %v", err)
 				}
 			}
@@ -134,13 +117,13 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 	}
 }
 
-func HandlerTrade[T any, V any](
+func HandlerBook[T any, V any](
 	ch chan T,
-	extractor func(upbitws.SpotTrade) V,
+	extractor func(upbitws.SpotOrderbook) V,
 	converter func(V) T,
-) func(upbitws.SpotTrade) error {
-	return func(trade upbitws.SpotTrade) error {
-		value := extractor(trade)
+) func(upbitws.SpotOrderbook) error {
+	return func(orderbook upbitws.SpotOrderbook) error {
+		value := extractor(orderbook)
 
 		if converter != nil {
 			ch <- converter(value)
@@ -157,51 +140,34 @@ func HandlerTrade[T any, V any](
 	}
 }
 
-func ExtractPrice(trade upbitws.SpotTrade) float64 {
-	return trade.TradePrice
+func ExtractBestBidPrc(orderbook upbitws.SpotOrderbook) float64 {
+	return orderbook.OrderbookUnits[0].BidPrice
 }
 
-func ExtractQuantity(trade upbitws.SpotTrade) float64 {
-	return trade.TradeVolume
+func ExtractBestBidQty(orderbook upbitws.SpotOrderbook) float64 {
+	return orderbook.OrderbookUnits[0].BidSize
 }
 
-// Best ask and bid price and quantity at execution period.
-func ExtractExecBestBidPrc(trade upbitws.SpotTrade) float64 {
-	return trade.BestBidPrice
+func ExtractBestAskPrc(orderbook upbitws.SpotOrderbook) float64 {
+	return orderbook.OrderbookUnits[0].AskPrice
 }
 
-func ExtractExecBestBidQty(trade upbitws.SpotTrade) float64 {
-	return trade.BestBidSize
+func ExtractBestAskQty(orderbook upbitws.SpotOrderbook) float64 {
+	return orderbook.OrderbookUnits[0].AskSize
 }
 
-func ExtractExecBestAskPrc(trade upbitws.SpotTrade) float64 {
-	return trade.BestAskPrice
+func NewBestBidPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+	return HandlerBook(ch, ExtractBestBidPrc, nil)
 }
 
-func ExtractExecBestAskQty(trade upbitws.SpotTrade) float64 {
-	return trade.BestAskSize
+func NewBestBidQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+	return HandlerBook(ch, ExtractBestBidQty, nil)
 }
 
-func NewPriceHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractPrice, nil)
+func NewBestAskPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+	return HandlerBook(ch, ExtractBestAskPrc, nil)
 }
 
-func NewQuantityHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractQuantity, nil)
-}
-
-func NewExecBestBidPrcHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestBidPrc, nil)
-}
-
-func NewExecBestBidQtyHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestBidQty, nil)
-}
-
-func NewExecBestAskPrcHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestAskPrc, nil)
-}
-
-func NewExecBestAskQtyHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestAskQty, nil)
+func NewBestAskQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+	return HandlerBook(ch, ExtractBestAskQty, nil)
 }

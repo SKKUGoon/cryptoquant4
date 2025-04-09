@@ -50,13 +50,21 @@ type EngineContext struct {
 	binanceTradeChan chan float64
 	anchorTradeChan  chan float64 // KRW-USDT
 
-	kimchiBestBidChan  chan float64
-	binanceBestBidChan chan float64
-	anchorBestBidChan  chan float64
+	kimchiBestBidPrcChan  chan float64
+	binanceBestBidPrcChan chan float64
+	anchorBestBidPrcChan  chan float64
 
-	kimchiBestAskChan  chan float64
-	binanceBestAskChan chan float64
-	anchorBestAskChan  chan float64
+	kimchiBestBidQtyChan  chan float64
+	binanceBestBidQtyChan chan float64
+	anchorBestBidQtyChan  chan float64
+
+	kimchiBestAskPrcChan  chan float64
+	binanceBestAskPrcChan chan float64
+	anchorBestAskPrcChan  chan float64
+
+	kimchiBestAskQtyChan  chan float64
+	binanceBestAskQtyChan chan float64
+	anchorBestAskQtyChan  chan float64
 
 	// logger
 	logger *log.Logger
@@ -135,13 +143,21 @@ func New(ctx context.Context) *EngineContext {
 		binanceTradeChan: make(chan float64),
 		anchorTradeChan:  make(chan float64),
 
-		kimchiBestBidChan:  make(chan float64),
-		binanceBestBidChan: make(chan float64),
-		anchorBestBidChan:  make(chan float64),
+		kimchiBestBidPrcChan:  make(chan float64),
+		binanceBestBidPrcChan: make(chan float64),
+		anchorBestBidPrcChan:  make(chan float64),
 
-		kimchiBestAskChan:  make(chan float64),
-		binanceBestAskChan: make(chan float64),
-		anchorBestAskChan:  make(chan float64),
+		kimchiBestAskPrcChan:  make(chan float64),
+		binanceBestAskPrcChan: make(chan float64),
+		anchorBestAskPrcChan:  make(chan float64),
+
+		kimchiBestAskQtyChan:  make(chan float64),
+		binanceBestAskQtyChan: make(chan float64),
+		anchorBestAskQtyChan:  make(chan float64),
+
+		kimchiBestBidQtyChan:  make(chan float64),
+		binanceBestBidQtyChan: make(chan float64),
+		anchorBestBidQtyChan:  make(chan float64),
 
 		tsLog: make(chan database.PremiumLog),
 	}
@@ -191,13 +207,21 @@ func (e *EngineContext) StartAsset() {
 	binanceAsset.SetPriceChannel(e.binanceTradeChan)
 	anchorAsset.SetPriceChannel(e.anchorTradeChan)
 
-	kimchiAsset.SetBestBidChannel(e.kimchiBestBidChan)
-	binanceAsset.SetBestBidChannel(e.binanceBestBidChan)
-	anchorAsset.SetBestBidChannel(e.anchorBestBidChan)
+	kimchiAsset.SetBestBidPrcChannel(e.kimchiBestBidPrcChan)
+	binanceAsset.SetBestBidPrcChannel(e.binanceBestBidPrcChan)
+	anchorAsset.SetBestBidPrcChannel(e.anchorBestBidPrcChan)
 
-	kimchiAsset.SetBestAskChannel(e.kimchiBestAskChan)
-	binanceAsset.SetBestAskChannel(e.binanceBestAskChan)
-	anchorAsset.SetBestAskChannel(e.anchorBestAskChan)
+	kimchiAsset.SetBestAskPrcChannel(e.kimchiBestAskPrcChan)
+	binanceAsset.SetBestAskPrcChannel(e.binanceBestAskPrcChan)
+	anchorAsset.SetBestAskPrcChannel(e.anchorBestAskPrcChan)
+
+	kimchiAsset.SetBestBidQtyChannel(e.kimchiBestBidQtyChan)
+	binanceAsset.SetBestBidQtyChannel(e.binanceBestBidQtyChan)
+	anchorAsset.SetBestBidQtyChannel(e.anchorBestBidQtyChan)
+
+	kimchiAsset.SetBestAskQtyChannel(e.kimchiBestAskQtyChan)
+	binanceAsset.SetBestAskQtyChannel(e.binanceBestAskQtyChan)
+	anchorAsset.SetBestAskQtyChannel(e.anchorBestAskQtyChan)
 
 	e.KimchiPairs = &kimchiarb.KimchiPremium{
 		AnchorAsset: anchorAsset,
@@ -211,22 +235,34 @@ func (e *EngineContext) StartAsset() {
 func (e *EngineContext) StartMonitor() {
 	e.logger.Printf("Engine started")
 
-	// Start stream
+	// Start stream - Kimchi
 	e.logger.Printf("Starting stream for %v", e.KimchiAssetSymbol)
-	h1 := upbitmarket.NewPriceHandler(e.kimchiTradeChan)
-	h1s := []func(upbitws.SpotTrade) error{h1}
-	go upbitmarket.SubscribeTrade(e.ctx, e.KimchiAssetSymbol, h1s)
+	kimchi1 := upbitmarket.NewPriceHandler(e.kimchiTradeChan)
+	kimchi2 := upbitmarket.NewBestBidPrcHandler(e.kimchiBestBidPrcChan)
+	kimchi3 := upbitmarket.NewBestBidQtyHandler(e.kimchiBestBidQtyChan)
+	kimchi4 := upbitmarket.NewBestAskPrcHandler(e.kimchiBestAskPrcChan)
+	kimchi5 := upbitmarket.NewBestAskQtyHandler(e.kimchiBestAskQtyChan)
+	kimchiHandlerPrice := []func(upbitws.SpotTrade) error{kimchi1}
+	kimchiHandlerBook := []func(upbitws.SpotOrderbook) error{kimchi2, kimchi3, kimchi4, kimchi5}
+	go upbitmarket.SubscribeTrade(e.ctx, e.KimchiAssetSymbol, kimchiHandlerPrice)
+	go upbitmarket.SubscribeBook(e.ctx, e.KimchiAssetSymbol, kimchiHandlerBook)
 
-	// Start stream
+	// Start stream - Cefi
 	e.logger.Printf("Starting stream for %v", e.CefiAssetSymbol)
-	h2 := binancemarket.NewPriceHandler(e.binanceTradeChan)
-	h2s := []func(binancews.FutureAggTrade) error{h2}
-	go binancemarket.SubscribeAggtrade(e.ctx, e.CefiAssetSymbol, h2s)
+	cefi1 := binancemarket.NewPriceHandler(e.binanceTradeChan)
+	cefi2 := binancemarket.NewBestBidPrcHandler(e.binanceBestBidPrcChan)
+	cefi3 := binancemarket.NewBestBidQtyHandler(e.binanceBestBidQtyChan)
+	cefi4 := binancemarket.NewBestAskPrcHandler(e.binanceBestAskPrcChan)
+	cefi5 := binancemarket.NewBestAskQtyHandler(e.binanceBestAskQtyChan)
+	cefiHandlerPrice := []func(binancews.FutureAggTrade) error{cefi1}
+	cefiHandlerBook := []func(binancews.FutureBookTicker) error{cefi2, cefi3, cefi4, cefi5}
+	go binancemarket.SubscribeAggtrade(e.ctx, e.CefiAssetSymbol, cefiHandlerPrice)
+	go binancemarket.SubscribeBook(e.ctx, e.CefiAssetSymbol, cefiHandlerBook)
 
-	// Start stream
+	// Start stream - Anchor
 	e.logger.Printf("Starting stream for %v", e.AnchorAssetSymbol)
-	h3 := upbitmarket.NewPriceHandler(e.anchorTradeChan)
-	h3s := []func(upbitws.SpotTrade) error{h3}
+	anchor1 := upbitmarket.NewPriceHandler(e.anchorTradeChan)
+	h3s := []func(upbitws.SpotTrade) error{anchor1}
 	go upbitmarket.SubscribeTrade(e.ctx, e.AnchorAssetSymbol, h3s)
 }
 
