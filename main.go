@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "net/http/pprof"
+
 	"context"
 	"log"
 	"os"
@@ -8,16 +10,20 @@ import (
 	"syscall"
 
 	"cryptoquant.com/m/engine"
-	"github.com/joho/godotenv"
 )
 
-// For local development
-func init() {
-	// Load environment variables
-	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-}
+// // For local development
+// func init() {
+// 	// Load environment variables
+// 	if err := godotenv.Load(".env"); err != nil {
+// 		log.Fatalf("Error loading .env file: %v", err)
+// 	}
+
+// 	go func() {
+// 		log.Println("pprof listening at :6060")
+// 		log.Println(http.ListenAndServe("localhost:6060", nil))
+// 	}()
+// }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
