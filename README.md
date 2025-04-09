@@ -23,6 +23,11 @@ CryptoQuant is a high-performance cryptocurrency trading and analysis platform t
 - Go 1.23.1 or later
 - Docker and Docker Compose
 - PostgreSQL (if using database features)
+- TimeScaleDB (if using database features)
+
+```bash
+docker-network.sh
+```
 
 ## Installation
 
