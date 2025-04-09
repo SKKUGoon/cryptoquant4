@@ -23,6 +23,8 @@ services:
       - BINANCE_API_KEY=${BINANCE_API_KEY}
     volumes:
       - ./log:/app/log
+    networks:
+      - shared
     # Uncomment if you need to expose ports
     # ports:
     #   - "8080:8080" 
