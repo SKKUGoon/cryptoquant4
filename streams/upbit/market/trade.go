@@ -89,18 +89,31 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 	pingTicker := time.NewTicker(40 * time.Second)
 	defer pingTicker.Stop()
 
+	// Start ping loop in a separate goroutine
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-pingTicker.C:
+				// Send ping frame
+				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
+					log.Printf("Failed to send ping: %v", err)
+					// Closing conn will make ReadJSON fail → triggers reconnect in main loop
+					_ = conn.Close()
+					return
+				} else {
+					log.Printf("Ping sent")
+				}
+			}
+		}
+	}()
+
 	// Read messages
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-pingTicker.C:
-			// Send ping frame
-			if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
-				log.Printf("Failed to send ping: %v", err)
-				// Try to reconnect
-				return SubscribeTrade(ctx, symbol, handlers)
-			}
 		default:
 			var trade upbitws.SpotTrade
 			if err := conn.ReadJSON(&trade); err != nil {

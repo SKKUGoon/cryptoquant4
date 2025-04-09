@@ -1,67 +1,67 @@
 services:
-  btc:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cryptoquant_btc
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
-      - BINANCE_SYMBOL=BTCUSDT
-      - UPBIT_SYMBOL=KRW-BTC
-      - ANCHOR_SYMBOL=KRW-USDT
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-    volumes:
-      - ./log/btc:/app/log
-    networks:
-      - shared
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # btc:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: cryptoquant_btc
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - USERNAME=${USERNAME}
+  #     - PASSWORD=${PASSWORD}
+  #     - PG_HOST=${PG_HOST}
+  #     - PG_PORT=${PG_PORT}
+  #     - PG_NAME=${PG_NAME}
+  #     - TS_HOST=${TS_HOST}
+  #     - TS_PORT=${TS_PORT}
+  #     - TS_NAME=${TS_NAME}
+  #     - BINANCE_SYMBOL=BTCUSDT
+  #     - UPBIT_SYMBOL=KRW-BTC
+  #     - ANCHOR_SYMBOL=KRW-USDT
+  #     - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+  #     - BINANCE_API_KEY=${BINANCE_API_KEY}
+  #   volumes:
+  #     - ./log/btc:/app/log
+  #   networks:
+  #     - shared
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
-  eth:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cryptoquant_eth
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
-      - BINANCE_SYMBOL=ETHUSDT
-      - UPBIT_SYMBOL=KRW-ETH
-      - ANCHOR_SYMBOL=KRW-USDT
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-    volumes:
-      - ./log/eth:/app/log
-    networks:
-      - shared
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # eth:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: cryptoquant_eth
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - USERNAME=${USERNAME}
+  #     - PASSWORD=${PASSWORD}
+  #     - PG_HOST=${PG_HOST}
+  #     - PG_PORT=${PG_PORT}
+  #     - PG_NAME=${PG_NAME}
+  #     - TS_HOST=${TS_HOST}
+  #     - TS_PORT=${TS_PORT}
+  #     - TS_NAME=${TS_NAME}
+  #     - BINANCE_SYMBOL=ETHUSDT
+  #     - UPBIT_SYMBOL=KRW-ETH
+  #     - ANCHOR_SYMBOL=KRW-USDT
+  #     - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+  #     - BINANCE_API_KEY=${BINANCE_API_KEY}
+  #   volumes:
+  #     - ./log/eth:/app/log
+  #   networks:
+  #     - shared
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
   cow:
     build:
