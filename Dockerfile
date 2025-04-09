@@ -26,9 +26,6 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /app/main .
 
-# Copy the .env file
-COPY --from=builder /app/.env .
-
 # Create a non-root user and set up permissions
 RUN adduser -D -g '' appuser && \
     mkdir -p /app/log && \

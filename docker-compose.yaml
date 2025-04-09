@@ -26,3 +26,7 @@ services:
     # Uncomment if you need to expose ports
     # ports:
     #   - "8080:8080" 
+networks:
+  shared:
+    external: true
+    name: crypto-bridge
