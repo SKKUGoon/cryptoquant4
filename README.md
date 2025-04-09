@@ -38,7 +38,15 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-3. Build and run with Docker:
+3. Set up log
+```bash
+mkdir log
+
+# Or sudo chown -R 1000:1000 ./log
+chmod -R 777 ./log
+```
+
+4. Build and run with Docker:
 ```bash
 docker-compose up --build
 ```
