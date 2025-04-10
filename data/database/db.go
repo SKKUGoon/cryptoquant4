@@ -40,7 +40,7 @@ func (d *Database) Close() error {
 	return d.db.Close()
 }
 
-func (d *Database) GetTradeMetadata(key string) (any, error) {
+func (d *Database) GetTradeMetadata(key string, defaultValue any) (any, error) {
 	query := `SELECT value, value_type 
 		FROM cryptoquant.trading_metadata
 		WHERE key = $1`
@@ -89,8 +89,8 @@ func (d *Database) GetTradeMetadata(key string) (any, error) {
 			return nil, fmt.Errorf("unsupported value_type: %s", valueType)
 		}
 	}
-
-	return nil, fmt.Errorf("key not found: %s", key)
+	log.Printf("key not found: %s. Using default value: %v.", key, defaultValue)
+	return defaultValue, nil
 }
 
 // GetBacktestData imports Nimbus data for testing purposes

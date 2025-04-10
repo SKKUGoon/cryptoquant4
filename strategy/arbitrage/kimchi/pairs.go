@@ -112,6 +112,18 @@ func (p *KimchiPremium) Status() (bool, string) {
 	)
 }
 
+func (p *KimchiPremium) CheckEnter(enter float64) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.PremiumEnterPos < enter
+}
+
+func (p *KimchiPremium) CheckExit(exit float64) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.PremiumExitPos > exit
+}
+
 func (p *KimchiPremium) ToPremiumLog() database.PremiumLog {
 	p.mu.Lock()
 	defer p.mu.Unlock()

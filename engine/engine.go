@@ -38,14 +38,16 @@ type EngineContext struct {
 	FutureMarketData *binancesource.BinanceFutureMarketData
 
 	// Strategy
-	KimchiPairs *kimchiarb.KimchiPremium
+	KimchiPairs          *kimchiarb.KimchiPremium
+	EnterPremiumBoundary float64
+	ExitPremiumBoundary  float64
 
 	// Target Symbol
 	KimchiAssetSymbol string
 	CefiAssetSymbol   string
 	AnchorAssetSymbol string // USDT
 
-	// Trading Parameters
+	// Premium Calculation Parameters
 	kimchiTradeChan  chan float64
 	binanceTradeChan chan float64
 	anchorTradeChan  chan float64 // KRW-USDT
@@ -65,6 +67,10 @@ type EngineContext struct {
 	kimchiBestAskQtyChan  chan float64
 	binanceBestAskQtyChan chan float64
 	anchorBestAskQtyChan  chan float64
+
+	// Trading Channel
+	inPosition bool
+	orderChan  chan any
 
 	// logger
 	logger *log.Logger
@@ -159,6 +165,9 @@ func New(ctx context.Context) *EngineContext {
 		binanceBestBidQtyChan: make(chan float64),
 		anchorBestBidQtyChan:  make(chan float64),
 
+		inPosition: false,
+		orderChan:  make(chan any),
+
 		tsLog: make(chan database.PremiumLog),
 	}
 
@@ -195,6 +204,30 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 
 	e.KimchiAssetSymbol = ksymbol
 	e.CefiAssetSymbol = csymbol
+}
+
+func (e *EngineContext) ConfirmTradeParameters() {
+	e.logger.Printf("Confirming trade parameters")
+
+	// Premium Calculation Parameters
+	// Default values
+	// EnterPremiumBoundary: 0.9980
+	// ExitPremiumBoundary: 1.0035
+	enterPremiumBoundary, err := e.Database.GetTradeMetadata("enter_premium_boundary", 0.9980)
+	if err != nil {
+		e.logger.Printf("Failed to get enter premium boundary: %v", err)
+		panic(err)
+	}
+	e.EnterPremiumBoundary = enterPremiumBoundary.(float64)
+
+	exitPremiumBoundary, err := e.Database.GetTradeMetadata("exit_premium_boundary", 1.0035)
+	if err != nil {
+		e.logger.Printf("Failed to get exit premium boundary: %v", err)
+		panic(err)
+	}
+	e.ExitPremiumBoundary = exitPremiumBoundary.(float64)
+
+	e.logger.Printf("Trade parameters confirmed: enterPremiumBoundary: %v, exitPremiumBoundary: %v", e.EnterPremiumBoundary, e.ExitPremiumBoundary)
 }
 
 func (e *EngineContext) StartAsset() {
@@ -299,11 +332,27 @@ func (e *EngineContext) StartStrategy() {
 					e.logger.Println(msg)
 				}
 
+				// Check the premium boundary
+				if e.inPosition && e.KimchiPairs.CheckExit(e.ExitPremiumBoundary) {
+					// e.orderChan <- "exit"
+					// TODO: Implement this
+					e.logger.Printf("Exiting position")
+				} else if !e.inPosition && e.KimchiPairs.CheckEnter(e.EnterPremiumBoundary) {
+					// e.orderChan <- "enter"
+					// TODO: Implement this
+					e.logger.Printf("Entering position")
+				}
+
 				log := e.KimchiPairs.ToPremiumLog()
 				e.tsLog <- log
 			}
 		}
 	}()
+}
+
+func (e *EngineContext) StartOrderExecutedCheck() {
+	// Check if the order is executed
+	// TODO: Implement this
 }
 
 func (e *EngineContext) StartTSLog() {

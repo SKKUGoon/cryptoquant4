@@ -20,6 +20,7 @@ func main() {
 	// Initialize engine with production settings
 	engine := engine.New(ctx)
 	engine.ConfirmTargetSymbols()
+	engine.ConfirmTradeParameters()
 
 	// Start all necessary components
 	engine.StartAsset()

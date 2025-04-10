@@ -41,6 +41,7 @@ func main() {
 	// Initialize engine with development settings
 	engine := engine.New(ctx)
 	engine.ConfirmTargetSymbols()
+	engine.ConfirmTradeParameters()
 
 	// Start all components with development logging
 	log.Println("Starting development environment...")

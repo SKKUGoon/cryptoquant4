@@ -42,7 +42,7 @@ func TestGetTradeMetadataString(t *testing.T) {
 	}
 	defer db.Close()
 
-	metadata, err := db.GetTradeMetadata("TEST_STRING")
+	metadata, err := db.GetTradeMetadata("TEST_STRING", nil)
 	if err != nil {
 		t.Fatalf("Failed to get trade metadata: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestGetTradeMetadataInt(t *testing.T) {
 	}
 	defer db.Close()
 
-	metadata, err := db.GetTradeMetadata("TEST_INT")
+	metadata, err := db.GetTradeMetadata("TEST_INT", nil)
 	if err != nil {
 		t.Fatalf("Failed to get trade metadata: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestGetTradeMetadataFloat(t *testing.T) {
 	}
 	defer db.Close()
 
-	metadata, err := db.GetTradeMetadata("TEST_FLOAT64")
+	metadata, err := db.GetTradeMetadata("TEST_FLOAT64", nil)
 	if err != nil {
 		t.Fatalf("Failed to get trade metadata: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestGetTradeMetadataBool(t *testing.T) {
 	}
 	defer db.Close()
 
-	metadata, err := db.GetTradeMetadata("TEST_BOOL")
+	metadata, err := db.GetTradeMetadata("TEST_BOOL", nil)
 	if err != nil {
 		t.Fatalf("Failed to get trade metadata: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestGetTradeMetadataBool(t *testing.T) {
 }
 
 func TestGetTradeMetadataStringArray(t *testing.T) {
-	if err := godotenv.Load("../.env"); err != nil {
+	if err := godotenv.Load(PGENVLOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestGetTradeMetadataStringArray(t *testing.T) {
 	}
 	defer db.Close()
 
-	metadata, err := db.GetTradeMetadata("TEST_STRING_ARRAY")
+	metadata, err := db.GetTradeMetadata("TEST_STRING_ARRAY", nil)
 	if err != nil {
 		t.Fatalf("Failed to get trade metadata: %v", err)
 	}
