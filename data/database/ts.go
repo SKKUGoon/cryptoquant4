@@ -64,8 +64,8 @@ func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
 
 	// Prepare the statement
 	stmt, err := tx.Prepare(`
-		INSERT INTO premium_logs (time, symbol, premium, kimchi_price, anchor_price, cefi_price, kimchi_best_bid, kimchi_best_ask, anchor_best_bid, anchor_best_ask, cefi_best_bid, cefi_best_ask)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO premium_logs (time, symbol, kimchi_price, anchor_price, cefi_price, kimchi_best_bid, kimchi_best_ask, cefi_best_bid, cefi_best_ask)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -78,14 +78,11 @@ func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
 		_, err := stmt.Exec(
 			log.Timestamp,
 			log.Symbol,
-			log.Premium,
 			log.KimchiPrice,
 			log.AnchorPrice,
 			log.CefiPrice,
 			log.KimchiBestBid,
 			log.KimchiBestAsk,
-			nil,
-			nil,
 			log.CefiBestBid,
 			log.CefiBestAsk,
 		)

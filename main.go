@@ -1,3 +1,6 @@
+//go:build !server
+// +build !server
+
 package main
 
 import (
@@ -21,19 +24,26 @@ func init() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
+	// Start pprof server for debugging
 	go func() {
 		log.Println("pprof listening at :6060")
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+
+	// Enable more verbose logging for development
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Initialize engine with development settings
 	engine := engine.New(ctx)
 	engine.ConfirmTargetSymbols()
 
+	// Start all components with development logging
+	log.Println("Starting development environment...")
 	engine.StartAsset()
 	engine.StartMonitor()
 	engine.StartStrategy()

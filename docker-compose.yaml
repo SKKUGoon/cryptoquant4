@@ -3,6 +3,8 @@ services:
   #   build:
   #     context: .
   #     dockerfile: Dockerfile
+  #     args:
+  #       - BUILD_TAGS=server
   #   container_name: cryptoquant_btc
   #   restart: unless-stopped
   #   env_file:
@@ -31,42 +33,46 @@ services:
   #       max-size: "10m"
   #       max-file: "3"
 
-  # eth:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: cryptoquant_eth
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     - USERNAME=${USERNAME}
-  #     - PASSWORD=${PASSWORD}
-  #     - PG_HOST=${PG_HOST}
-  #     - PG_PORT=${PG_PORT}
-  #     - PG_NAME=${PG_NAME}
-  #     - TS_HOST=${TS_HOST}
-  #     - TS_PORT=${TS_PORT}
-  #     - TS_NAME=${TS_NAME}
-  #     - BINANCE_SYMBOL=ETHUSDT
-  #     - UPBIT_SYMBOL=KRW-ETH
-  #     - ANCHOR_SYMBOL=KRW-USDT
-  #     - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-  #     - BINANCE_API_KEY=${BINANCE_API_KEY}
-  #   volumes:
-  #     - ./log/eth:/app/log
-  #   networks:
-  #     - shared
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
+  xrp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_TAGS=server
+    container_name: cryptoquant_xrp
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_NAME=${PG_NAME}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME}
+      - BINANCE_SYMBOL=XRPUSDT
+      - UPBIT_SYMBOL=KRW-XRP
+      - ANCHOR_SYMBOL=KRW-USDT
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+    volumes:
+      - ./log/xrp:/app/log
+    networks:
+      - shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   cow:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - BUILD_TAGS=server
     container_name: cryptoquant_cow
     restart: unless-stopped
     env_file:
@@ -95,37 +101,39 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  kava:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cryptoquant_kava
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
-      - BINANCE_SYMBOL=KAVAUSDT
-      - UPBIT_SYMBOL=KRW-KAVA
-      - ANCHOR_SYMBOL=KRW-USDT
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-    volumes:
-      - ./log/kava:/app/log
-    networks:
-      - shared
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # kava:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     args:
+  #       - BUILD_TAGS=server
+  #   container_name: cryptoquant_kava
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - USERNAME=${USERNAME}
+  #     - PASSWORD=${PASSWORD}
+  #     - PG_HOST=${PG_HOST}
+  #     - PG_PORT=${PG_PORT}
+  #     - PG_NAME=${PG_NAME}
+  #     - TS_HOST=${TS_HOST}
+  #     - TS_PORT=${TS_PORT}
+  #     - TS_NAME=${TS_NAME}
+  #     - BINANCE_SYMBOL=KAVAUSDT
+  #     - UPBIT_SYMBOL=KRW-KAVA
+  #     - ANCHOR_SYMBOL=KRW-USDT
+  #     - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+  #     - BINANCE_API_KEY=${BINANCE_API_KEY}
+  #   volumes:
+  #     - ./log/kava:/app/log
+  #   networks:
+  #     - shared
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
 networks:
   shared:
