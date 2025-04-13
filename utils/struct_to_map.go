@@ -20,7 +20,7 @@ func StructToParamsMap(s any) map[string]string {
 	// Extract Struct fields and tags (for json)
 	t := v.Type()
 
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		field := v.Field(i)       // Value of the field
 		structField := t.Field(i) // Struct field definition
 

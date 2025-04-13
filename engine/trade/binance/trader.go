@@ -1,4 +1,4 @@
-package trade
+package binancetrade
 
 import (
 	"log"
@@ -9,6 +9,7 @@ import (
 )
 
 type Trader struct {
+	// API Key
 	pubkey string // Binance API Key
 	prikey string // Binance API Secret
 
@@ -17,7 +18,8 @@ type Trader struct {
 	currentRate int
 
 	// Channels to receive orders from strategy
-	orders chan binancerest.OrderSheet
+	orders     chan binancerest.OrderSheet
+	inPosition bool
 }
 
 func NewTrader() *Trader {
@@ -29,8 +31,9 @@ func NewTrader() *Trader {
 	}
 
 	return &Trader{
-		pubkey: pubkey,
-		prikey: prikey,
+		pubkey:     pubkey,
+		prikey:     prikey,
+		inPosition: false,
 	}
 }
 
@@ -54,4 +57,8 @@ func (t *Trader) checkRateLimit(weight int) {
 		time.Sleep(nextMinute.Sub(now))
 		t.currentRate = 0 // Reset rate limit counter for new minute
 	}
+}
+
+func (t *Trader) Run() {
+
 }

@@ -10,6 +10,7 @@ services:
   #   env_file:
   #     - .env
   #   environment:
+  #     - ENGINE_NAME=btc
   #     - USERNAME=${USERNAME}
   #     - PASSWORD=${PASSWORD}
   #     - PG_HOST=${PG_HOST}
@@ -44,6 +45,7 @@ services:
     env_file:
       - .env
     environment:
+      - ENGINE_NAME=xrp
       - USERNAME=${USERNAME}
       - PASSWORD=${PASSWORD}
       - PG_HOST=${PG_HOST}
@@ -78,6 +80,7 @@ services:
     env_file:
       - .env
     environment:
+      - ENGINE_NAME=cow
       - USERNAME=${USERNAME}
       - PASSWORD=${PASSWORD}
       - PG_HOST=${PG_HOST}
@@ -112,6 +115,7 @@ services:
   #   env_file:
   #     - .env
   #   environment:
+  #     - ENGINE_NAME=kava
   #     - USERNAME=${USERNAME}
   #     - PASSWORD=${PASSWORD}
   #     - PG_HOST=${PG_HOST}

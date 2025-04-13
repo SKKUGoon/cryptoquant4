@@ -1,4 +1,4 @@
-package trade
+package binancetrade
 
 import (
 	"encoding/json"
@@ -16,7 +16,10 @@ func (t *Trader) SendOrder(orderSheet binancerest.OrderSheet) (binancerest.Order
 	t.checkRateLimit(weight)
 
 	// Make query + signature
-	queryString, signature := t.GetSignature(orderSheet)
+	queryString, signature, err := t.GetSignature(orderSheet)
+	if err != nil {
+		return binancerest.OrderResult{}, err
+	}
 	fullQuery := queryString + "&signature=" + signature
 
 	// Send request
@@ -54,7 +57,10 @@ func (t *Trader) SendOrders(ordersheets []binancerest.OrderSheet) (binancerest.B
 	t.checkRateLimit(weight)
 
 	// Make query + signature
-	queryString, signature := t.GetSignatureBatch(ordersheets)
+	queryString, signature, err := t.GetSignatureBatch(ordersheets)
+	if err != nil {
+		return binancerest.BatchOrderResponse{}, err
+	}
 	fullQuery := queryString + "&signature=" + signature
 
 	// Send request
@@ -87,5 +93,6 @@ func (t *Trader) SendOrders(ordersheets []binancerest.OrderSheet) (binancerest.B
 }
 
 func (t *Trader) CancelOrder(orderSheet binancerest.OrderSheet) ([]byte, error) {
+	// TODO: Implement
 	return nil, nil
 }

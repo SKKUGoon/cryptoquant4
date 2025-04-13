@@ -55,3 +55,22 @@ func (e *BinanceFutureTradeConfig) GetSymbolPricePrecision(symbol string) int {
 func (e *BinanceFutureTradeConfig) GetSymbolQuantityPrecision(symbol string) int {
 	return e.ExchangeInfo.GetSymbolInfo(symbol).GetSymbolQuantityPrecision()
 }
+
+func (e *BinanceFutureTradeConfig) AuditOrderSheetPrecision(orderSheet *binancerest.OrderSheet) error {
+	// Audit order sheet error
+
+	pricePrecision := e.GetSymbolPricePrecision(orderSheet.Symbol)
+	quantityPrecision := e.GetSymbolQuantityPrecision(orderSheet.Symbol)
+
+	if !orderSheet.Price.IsZero() {
+		roundedPrice := orderSheet.Price.Round(int32(pricePrecision))
+		orderSheet.Price = roundedPrice
+	}
+
+	if !orderSheet.Quantity.IsZero() {
+		roundedQuantity := orderSheet.Quantity.Round(int32(quantityPrecision))
+		orderSheet.Quantity = roundedQuantity
+	}
+
+	return nil
+}

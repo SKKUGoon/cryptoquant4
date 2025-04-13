@@ -1,9 +1,9 @@
-package trade_test
+package binancetrade_test
 
 import (
 	"testing"
 
-	"cryptoquant.com/m/engine/trade"
+	binancetrade "cryptoquant.com/m/engine/trade/binance"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	"github.com/joho/godotenv"
 )
@@ -13,7 +13,7 @@ func TestSendOrder(t *testing.T) {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
-	trader := trade.NewTrader()
+	trader := binancetrade.NewTrader()
 	trader.UpdateRateLimit(1000)
 	orderSheet := binancerest.NewTestOrderSheetLong()
 	result, err := trader.SendOrder(*orderSheet)
@@ -29,7 +29,7 @@ func TestSendOrders(t *testing.T) {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
-	trader := trade.NewTrader()
+	trader := binancetrade.NewTrader()
 	trader.UpdateRateLimit(1000)
 
 	orderSheet1 := binancerest.NewTestOrderSheetLong()

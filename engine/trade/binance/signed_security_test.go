@@ -1,11 +1,11 @@
-package trade_test
+package binancetrade_test
 
 import (
 	"testing"
 
 	"github.com/joho/godotenv"
 
-	"cryptoquant.com/m/engine/trade"
+	binancetrade "cryptoquant.com/m/engine/trade/binance"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 )
 
@@ -14,9 +14,12 @@ func TestGetSignature(t *testing.T) {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
-	trader := trade.NewTrader()
+	trader := binancetrade.NewTrader()
 	orderSheet := binancerest.NewTestOrderSheetLong()
-	queryString, signature := trader.GetSignature(*orderSheet)
+	queryString, signature, err := trader.GetSignature(*orderSheet)
+	if err != nil {
+		t.Fatalf("Error getting signature: %v", err)
+	}
 
 	t.Logf("queryString: %s", queryString)
 	t.Logf("signature: %s", signature)
@@ -27,11 +30,14 @@ func TestGetSignatureBatch(t *testing.T) {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
-	trader := trade.NewTrader()
+	trader := binancetrade.NewTrader()
 	orderSheet1 := binancerest.NewTestOrderSheetLong()
 	orderSheet2 := binancerest.NewTestOrderSheetShort()
 	orderSheets := []binancerest.OrderSheet{*orderSheet1, *orderSheet2}
-	queryString, signature := trader.GetSignatureBatch(orderSheets)
+	queryString, signature, err := trader.GetSignatureBatch(orderSheets)
+	if err != nil {
+		t.Fatalf("Error getting signature batch: %v", err)
+	}
 
 	t.Logf("queryString: %s", queryString)
 	t.Logf("signature: %s", signature)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -12,7 +13,11 @@ import (
 	config "cryptoquant.com/m/config"
 	database "cryptoquant.com/m/data/database"
 	binancesource "cryptoquant.com/m/data/sources/binance"
+	binancetrade "cryptoquant.com/m/engine/trade/binance"
+	upbittrade "cryptoquant.com/m/engine/trade/upbit"
+	binancerest "cryptoquant.com/m/internal/binance/rest"
 	binancews "cryptoquant.com/m/internal/binance/ws"
+	upbitrest "cryptoquant.com/m/internal/upbit/rest"
 	upbitws "cryptoquant.com/m/internal/upbit/ws"
 	kimchiarb "cryptoquant.com/m/strategy/arbitrage/kimchi"
 	binancemarket "cryptoquant.com/m/streams/binance/market"
@@ -23,6 +28,8 @@ import (
 // for both Upbit (Korean) and Binance exchanges for cross-exchange arbitrage
 // TODO: Add more exchanges support
 type EngineContext struct {
+	EngineName string
+
 	// Context and cancellation
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -31,6 +38,12 @@ type EngineContext struct {
 	// Exchange configurations
 	KimchiExchangeConfig  *config.UpbitSpotTradeConfig
 	BinanceExchangeConfig *config.BinanceFutureTradeConfig
+
+	// Traders
+	KimchiTrader  *upbittrade.Trader
+	BinanceTrader *binancetrade.Trader
+
+	// Accounts
 
 	// Data
 	Database         *database.Database
@@ -48,29 +61,30 @@ type EngineContext struct {
 	AnchorAssetSymbol string // USDT
 
 	// Premium Calculation Parameters
-	kimchiTradeChan  chan float64
-	binanceTradeChan chan float64
-	anchorTradeChan  chan float64 // KRW-USDT
+	kimchiTradeChan chan float64
+	forexTradeChan  chan float64
+	anchorTradeChan chan float64 // KRW-USDT
 
-	kimchiBestBidPrcChan  chan float64
-	binanceBestBidPrcChan chan float64
-	anchorBestBidPrcChan  chan float64
+	kimchiBestBidPrcChan chan float64
+	forexBestBidPrcChan  chan float64
+	anchorBestBidPrcChan chan float64
 
-	kimchiBestBidQtyChan  chan float64
-	binanceBestBidQtyChan chan float64
-	anchorBestBidQtyChan  chan float64
+	kimchiBestBidQtyChan chan float64
+	forexBestBidQtyChan  chan float64
+	anchorBestBidQtyChan chan float64
 
-	kimchiBestAskPrcChan  chan float64
-	binanceBestAskPrcChan chan float64
-	anchorBestAskPrcChan  chan float64
+	kimchiBestAskPrcChan chan float64
+	forexBestAskPrcChan  chan float64
+	anchorBestAskPrcChan chan float64
 
-	kimchiBestAskQtyChan  chan float64
-	binanceBestAskQtyChan chan float64
-	anchorBestAskQtyChan  chan float64
+	kimchiBestAskQtyChan chan float64
+	forexBestAskQtyChan  chan float64
+	anchorBestAskQtyChan chan float64
 
 	// Trading Channel
-	inPosition bool
-	orderChan  chan any
+	inPosition      bool
+	kimchiOrderChan chan upbitrest.OrderSheet
+	forexOrderChan  chan binancerest.OrderSheet
 
 	// logger
 	logger *log.Logger
@@ -97,27 +111,32 @@ func setupLog() *log.Logger {
 }
 
 func New(ctx context.Context) *EngineContext {
-	// Create a new context with cancellation
+	// 1. Get engine name
+	engineName := os.Getenv("ENGINE_NAME")
+	if engineName == "" {
+		panic("ENGINE_NAME is not set")
+	}
+
+	// 2. Create a new context with cancellation
+	// Controls the lifecycle of the whole engine and daemon structs and streams
 	engineCtx, cancel := context.WithCancel(ctx)
 
-	// Set up logging
+	// 3. Set up logging
 	logger := setupLog()
 
-	// Connect to database
+	// 4. Connect to database
 	db, err := database.ConnectDB()
 	if err != nil {
 		logger.Printf("Failed to connect to database: %v", err)
 		panic(err)
 	}
-
-	// Connect to TimeScale
 	ts, err := database.ConnectTS()
 	if err != nil {
 		logger.Printf("Failed to connect to TimeScale: %v", err)
 		panic(err)
 	}
 
-	// Create exchange configs
+	// 5. Create exchange configs
 	kimchiConfig, err := config.NewUpbitSpotTradeConfig()
 	if err != nil {
 		logger.Printf("Failed to create Upbit config: %v", err)
@@ -129,44 +148,54 @@ func New(ctx context.Context) *EngineContext {
 		panic(err)
 	}
 
+	// 6. Confirm anchor symbol
 	anchor := os.Getenv("ANCHOR_SYMBOL")
 	if anchor == "" {
-		logger.Printf("Failed to confirm target symbols: %v", "Environment variables not set")
+		logger.Printf("Failed to confirm anchor symbol: %v", "Environment variables not set")
 		panic("Environment variables not set")
 	}
 
+	// 7. Create traders
+	kimchiTrader := upbittrade.NewTrader()
+	binanceTrader := binancetrade.NewTrader()
+
+	// 8. Set order channels
 	engine := &EngineContext{
+		EngineName:            engineName,
 		ctx:                   engineCtx,
 		cancel:                cancel,
 		KimchiExchangeConfig:  kimchiConfig,
 		BinanceExchangeConfig: binanceConfig,
+		KimchiTrader:          kimchiTrader,
+		BinanceTrader:         binanceTrader,
 		Database:              db,
 		TimeScale:             ts,
 		logger:                logger,
 		AnchorAssetSymbol:     anchor,
 
-		kimchiTradeChan:  make(chan float64),
-		binanceTradeChan: make(chan float64),
-		anchorTradeChan:  make(chan float64),
+		kimchiTradeChan: make(chan float64),
+		forexTradeChan:  make(chan float64),
+		anchorTradeChan: make(chan float64),
 
-		kimchiBestBidPrcChan:  make(chan float64),
-		binanceBestBidPrcChan: make(chan float64),
-		anchorBestBidPrcChan:  make(chan float64),
+		kimchiBestBidPrcChan: make(chan float64),
+		forexBestBidPrcChan:  make(chan float64),
+		anchorBestBidPrcChan: make(chan float64),
 
-		kimchiBestAskPrcChan:  make(chan float64),
-		binanceBestAskPrcChan: make(chan float64),
-		anchorBestAskPrcChan:  make(chan float64),
+		kimchiBestAskPrcChan: make(chan float64),
+		forexBestAskPrcChan:  make(chan float64),
+		anchorBestAskPrcChan: make(chan float64),
 
-		kimchiBestAskQtyChan:  make(chan float64),
-		binanceBestAskQtyChan: make(chan float64),
-		anchorBestAskQtyChan:  make(chan float64),
+		kimchiBestAskQtyChan: make(chan float64),
+		forexBestAskQtyChan:  make(chan float64),
+		anchorBestAskQtyChan: make(chan float64),
 
-		kimchiBestBidQtyChan:  make(chan float64),
-		binanceBestBidQtyChan: make(chan float64),
-		anchorBestBidQtyChan:  make(chan float64),
+		kimchiBestBidQtyChan: make(chan float64),
+		forexBestBidQtyChan:  make(chan float64),
+		anchorBestBidQtyChan: make(chan float64),
 
-		inPosition: false,
-		orderChan:  make(chan any),
+		inPosition:      false,
+		kimchiOrderChan: make(chan upbitrest.OrderSheet),
+		forexOrderChan:  make(chan binancerest.OrderSheet),
 
 		tsLog: make(chan database.PremiumLog),
 	}
@@ -176,6 +205,13 @@ func New(ctx context.Context) *EngineContext {
 	return engine
 }
 
+// ConfirmTargetSymbols verifies that the trading symbols specified in environment variables
+// are available for trading on both Binance and Upbit exchanges. It checks:
+// 1. BINANCE_SYMBOL and UPBIT_SYMBOL environment variables are set
+// 2. The symbols are available for trading on their respective exchanges
+// 3. The anchor asset symbol is available on Upbit
+// If any check fails, it logs an error and panics. Otherwise, it sets the confirmed
+// symbols in the engine context.
 func (e *EngineContext) ConfirmTargetSymbols() {
 	csymbol := os.Getenv("BINANCE_SYMBOL")
 	ksymbol := os.Getenv("UPBIT_SYMBOL")
@@ -206,21 +242,30 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 	e.CefiAssetSymbol = csymbol
 }
 
+// ConfirmTradeParameters retrieves trade parameters from the database and sets them in the engine context.
+// It retrieves: (as a default)
+// 1. EnterPremiumBoundary: 0.9980
+// 2. ExitPremiumBoundary: 1.0035
+// These parameters are used to determine the entry and exit points for the arbitrage strategy.
 func (e *EngineContext) ConfirmTradeParameters() {
 	e.logger.Printf("Confirming trade parameters")
 
+	// Premium Calculation Parameters key value
+	enterPremiumBoundaryKey := fmt.Sprintf("%v_enter_premium_boundary", e.EngineName)
+	exitPremiumBoundaryKey := fmt.Sprintf("%v_exit_premium_boundary", e.EngineName)
+
 	// Premium Calculation Parameters
-	// Default values
+
 	// EnterPremiumBoundary: 0.9980
-	// ExitPremiumBoundary: 1.0035
-	enterPremiumBoundary, err := e.Database.GetTradeMetadata("enter_premium_boundary", 0.9980)
+	enterPremiumBoundary, err := e.Database.GetTradeMetadata(enterPremiumBoundaryKey, 0.9980)
 	if err != nil {
 		e.logger.Printf("Failed to get enter premium boundary: %v", err)
 		panic(err)
 	}
 	e.EnterPremiumBoundary = enterPremiumBoundary.(float64)
 
-	exitPremiumBoundary, err := e.Database.GetTradeMetadata("exit_premium_boundary", 1.0035)
+	// ExitPremiumBoundary: 1.0035
+	exitPremiumBoundary, err := e.Database.GetTradeMetadata(exitPremiumBoundaryKey, 1.0035)
 	if err != nil {
 		e.logger.Printf("Failed to get exit premium boundary: %v", err)
 		panic(err)
@@ -230,42 +275,52 @@ func (e *EngineContext) ConfirmTradeParameters() {
 	e.logger.Printf("Trade parameters confirmed: enterPremiumBoundary: %v, exitPremiumBoundary: %v", e.EnterPremiumBoundary, e.ExitPremiumBoundary)
 }
 
-func (e *EngineContext) StartAsset() {
+// StartAssetPair initializes the asset objects for the trading pairs and sets up their channels.
+// It creates:
+// 1. KimchiAsset: Represents the Kimchi trading pair
+// 2. ForexAsset: Represents the Cefi trading pair
+// 3. AnchorAsset: Represents the anchor trading pair
+func (e *EngineContext) StartAssetPair() {
 	e.logger.Printf("Starting asset for %v", e.KimchiAssetSymbol)
 	kimchiAsset := kimchiarb.NewAsset(e.KimchiAssetSymbol)
-	binanceAsset := kimchiarb.NewAsset(e.CefiAssetSymbol)
+	forexAsset := kimchiarb.NewAsset(e.CefiAssetSymbol)
 	anchorAsset := kimchiarb.NewAsset(e.AnchorAssetSymbol)
 
 	kimchiAsset.SetPriceChannel(e.kimchiTradeChan)
-	binanceAsset.SetPriceChannel(e.binanceTradeChan)
+	forexAsset.SetPriceChannel(e.forexTradeChan)
 	anchorAsset.SetPriceChannel(e.anchorTradeChan)
 
 	kimchiAsset.SetBestBidPrcChannel(e.kimchiBestBidPrcChan)
-	binanceAsset.SetBestBidPrcChannel(e.binanceBestBidPrcChan)
+	forexAsset.SetBestBidPrcChannel(e.forexBestBidPrcChan)
 	anchorAsset.SetBestBidPrcChannel(e.anchorBestBidPrcChan)
 
 	kimchiAsset.SetBestAskPrcChannel(e.kimchiBestAskPrcChan)
-	binanceAsset.SetBestAskPrcChannel(e.binanceBestAskPrcChan)
+	forexAsset.SetBestAskPrcChannel(e.forexBestAskPrcChan)
 	anchorAsset.SetBestAskPrcChannel(e.anchorBestAskPrcChan)
 
 	kimchiAsset.SetBestBidQtyChannel(e.kimchiBestBidQtyChan)
-	binanceAsset.SetBestBidQtyChannel(e.binanceBestBidQtyChan)
+	forexAsset.SetBestBidQtyChannel(e.forexBestBidQtyChan)
 	anchorAsset.SetBestBidQtyChannel(e.anchorBestBidQtyChan)
 
 	kimchiAsset.SetBestAskQtyChannel(e.kimchiBestAskQtyChan)
-	binanceAsset.SetBestAskQtyChannel(e.binanceBestAskQtyChan)
+	forexAsset.SetBestAskQtyChannel(e.forexBestAskQtyChan)
 	anchorAsset.SetBestAskQtyChannel(e.anchorBestAskQtyChan)
 
 	e.KimchiPairs = &kimchiarb.KimchiPremium{
 		AnchorAsset: anchorAsset,
-		CefiAsset:   binanceAsset,
+		CefiAsset:   forexAsset,
 		KimchiAsset: kimchiAsset,
 	}
 
 	e.logger.Printf("Asset Pairs(%v, %v, %v) initialized", e.KimchiAssetSymbol, e.CefiAssetSymbol, e.AnchorAssetSymbol)
 }
 
-func (e *EngineContext) StartMonitor() {
+// StartAssetStreams starts the streams for the asset pairs.
+// It creates total of 5 streams:
+// 1. KimchiStream: Represents the Kimchi trading pair (Upbit, 2 streams: price and book)
+// 2. CefiStream: Represents the Cefi trading pair (Binance, 2 streams: price and book)
+// 3. AnchorStream: Represents the anchor trading pair (Upbit, 1 stream: price)
+func (e *EngineContext) StartAssetStreams() {
 	e.logger.Printf("Engine started")
 
 	// Start stream - Kimchi
@@ -282,11 +337,11 @@ func (e *EngineContext) StartMonitor() {
 
 	// Start stream - Cefi
 	e.logger.Printf("Starting stream for %v", e.CefiAssetSymbol)
-	cefi1 := binancemarket.NewPriceHandler(e.binanceTradeChan)
-	cefi2 := binancemarket.NewBestBidPrcHandler(e.binanceBestBidPrcChan)
-	cefi3 := binancemarket.NewBestBidQtyHandler(e.binanceBestBidQtyChan)
-	cefi4 := binancemarket.NewBestAskPrcHandler(e.binanceBestAskPrcChan)
-	cefi5 := binancemarket.NewBestAskQtyHandler(e.binanceBestAskQtyChan)
+	cefi1 := binancemarket.NewPriceHandler(e.forexTradeChan)
+	cefi2 := binancemarket.NewBestBidPrcHandler(e.forexBestBidPrcChan)
+	cefi3 := binancemarket.NewBestBidQtyHandler(e.forexBestBidQtyChan)
+	cefi4 := binancemarket.NewBestAskPrcHandler(e.forexBestAskPrcChan)
+	cefi5 := binancemarket.NewBestAskQtyHandler(e.forexBestAskQtyChan)
 	cefiHandlerPrice := []func(binancews.FutureAggTrade) error{cefi1}
 	cefiHandlerBook := []func(binancews.FutureBookTicker) error{cefi2, cefi3, cefi4, cefi5}
 	go binancemarket.SubscribeAggtrade(e.ctx, e.CefiAssetSymbol, cefiHandlerPrice)
@@ -299,6 +354,9 @@ func (e *EngineContext) StartMonitor() {
 	go upbitmarket.SubscribeTrade(e.ctx, e.AnchorAssetSymbol, h3s)
 }
 
+// StartStrategy starts the arbitrage strategy.
+// It creates a goroutine that runs the arbitrage strategy and tracks consecutive failures.
+// If the strategy is not ready, it logs an error and panics. Otherwise, it logs a message and starts the strategy.
 func (e *EngineContext) StartStrategy() {
 	e.logger.Printf("Starting strategy")
 	go e.KimchiPairs.Run(e.ctx)
@@ -350,11 +408,8 @@ func (e *EngineContext) StartStrategy() {
 	}()
 }
 
-func (e *EngineContext) StartOrderExecutedCheck() {
-	// Check if the order is executed
-	// TODO: Implement this
-}
-
+// StartTSLog starts the TimeScale log.
+// It creates a goroutine that logs the premium data to the TimeScale database.
 func (e *EngineContext) StartTSLog() {
 	e.logger.Printf("Starting DB log")
 	buffer := make([]database.PremiumLog, 0, 100) // Insert 100 at a time
@@ -367,7 +422,7 @@ func (e *EngineContext) StartTSLog() {
 				buffer = append(buffer, row)
 				if len(buffer) >= 100 {
 					bufferCopy := make([]database.PremiumLog, len(buffer))
-					copy(bufferCopy, buffer)
+					copy(bufferCopy, buffer) // Copy the buffer to avoid race condition
 					go func(logs []database.PremiumLog) {
 						if err := e.TimeScale.InsertPremiumLog(logs); err != nil {
 							e.logger.Printf("Failed to insert premium log: %v", err)

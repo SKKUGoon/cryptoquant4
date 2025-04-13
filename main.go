@@ -45,8 +45,8 @@ func main() {
 
 	// Start all components with development logging
 	log.Println("Starting development environment...")
-	engine.StartAsset()
-	engine.StartMonitor()
+	engine.StartAssetPair()
+	engine.StartAssetStreams()
 	engine.StartStrategy()
 	engine.StartTSLog()
 
