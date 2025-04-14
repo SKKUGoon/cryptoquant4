@@ -2,11 +2,19 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	upbitrest "cryptoquant.com/m/internal/upbit/rest"
 )
 
 // Account should be single source of truth.
@@ -21,38 +29,140 @@ type AccountSource struct {
 	Redis *redis.Client
 	ctx   context.Context
 
-	// AvailableFund: Total amount of money (USDT/KRW) that is free to be reserved by containers.
-	// This money is shared by all containers.
-	AvailableFund Fund
-	// Amount already committed by a specific container for upcoming or in-progress trades.
-	// This money is per container.
-	ReservedFund Fund
+	// API Keys
+	binancePubkey string
+	binancePrikey string
 
-	Position       map[string]string
-	WalletSnapshot map[string]float64 // KRW, XRP, USDT, ... at startup.
+	upbitPubkey string
+	upbitPrikey string
+
+	BinanceFund Fund
+	UpbitFund   Fund
+
+	upbitWalletSnapshot   map[string]float64 // KRW, XRP, USDT, ... at startup.
+	binanceWalletSnapshot map[string]float64 // KRW, XRP, USDT, ... at startup.
 }
 
 type Fund struct {
-	USDT float64
-	KRW  float64
+	// AvailableFund: Total amount of money (USDT/KRW) that is free to be reserved by containers.
+	// This money is shared by all containers.
+	AvailableFund float64
+
+	// Amount already committed by a specific container for upcoming or in-progress trades.
+	// This money is per container.
+	ReservedFund float64
 }
 
+func NewAccountSource(ctx context.Context) *AccountSource {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "redis:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	binancePubkey := os.Getenv("BINANCE_API_KEY")
+	binancePrikey := os.Getenv("BINANCE_SECRET_KEY")
+
+	upbitPubkey := os.Getenv("UPBIT_API_KEY")
+	upbitPrikey := os.Getenv("UPBIT_SECRET_KEY")
+
+	return &AccountSource{
+		Redis: rdb,
+		ctx:   ctx,
+
+		binancePubkey: binancePubkey,
+		binancePrikey: binancePrikey,
+
+		upbitPubkey: upbitPubkey,
+		upbitPrikey: upbitPrikey,
+	}
+}
+
+func (a *AccountSource) OnInit() error {
+	if err := a.upbitFundSync(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *AccountSource) upbitFundSync() error {
+	// Create authorization token
+	nonce := uuid.NewString()
+	claims := jwt.MapClaims{
+		"access_key": a.upbitPubkey,
+		"nonce":      nonce,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(a.upbitPrikey))
+	if err != nil {
+		return err
+	}
+	authToken := "Bearer " + signedToken
+
+	// Send request
+	const urlBase = "https://api.upbit.com/v1/accounts"
+
+	req, err := http.NewRequest("GET", urlBase, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", authToken)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var accounts upbitrest.Accounts
+	if err := json.Unmarshal(body, &accounts); err != nil {
+		return err
+	}
+
+	// Save to redis
+	snapshot := make(map[string]float64)
+	for _, acc := range accounts {
+		currency := acc.Currency
+		balance, err := strconv.ParseFloat(acc.Balance, 64)
+		if err != nil {
+			return err
+		}
+
+		// Store individual currency balance
+		if err := a.SetPosition("upbit", currency, balance); err != nil {
+			return err
+		}
+
+		// Store in snapshot map
+		snapshot[currency] = balance
+
+		// Save KRW available to internal fund
+		if currency == "KRW" {
+			a.UpbitFund.AvailableFund = balance
+			if err := a.SetAvailableFund("upbit", balance); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Save snapshot to redis
+	if err := a.SetWalletSnapshot("upbit", snapshot); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReservedFund: Total amount of money (USDT/KRW) that is reserved by containers.
 func (a *AccountSource) keyReservedFund(exchange string) string {
 	return fmt.Sprintf("reserved_fund:%s", exchange)
-}
-
-func (a *AccountSource) SetAvailableFund(exchange string, amount float64) error {
-	key := fmt.Sprintf("available_fund:%s", exchange)
-	return a.Redis.Set(a.ctx, key, amount, 0).Err()
-}
-
-func (a *AccountSource) GetAvailableFund(exchange string) (float64, error) {
-	key := fmt.Sprintf("available_fund:%s", exchange)
-	val, err := a.Redis.Get(a.ctx, key).Result()
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseFloat(val, 64)
 }
 
 func (a *AccountSource) SetReservedFund(exchange string, amount float64, ttl time.Duration) error {
@@ -60,11 +170,133 @@ func (a *AccountSource) SetReservedFund(exchange string, amount float64, ttl tim
 	return a.Redis.Set(a.ctx, key, amount, ttl).Err()
 }
 
-func (a *AccountSource) GetReservedFund(exchange string) (float64, error) {
+func (a *AccountSource) getReservedFund(exchange string) (float64, error) {
 	key := a.keyReservedFund(exchange)
 	val, err := a.Redis.Get(a.ctx, key).Result()
 	if err != nil {
 		return 0, err
 	}
 	return strconv.ParseFloat(val, 64)
+}
+
+func (a *AccountSource) SyncReservedFundUpbit() error {
+	reserve, err := a.getReservedFund("upbit")
+	if err != nil {
+		return err
+	}
+
+	a.UpbitFund.ReservedFund = reserve
+	return nil
+}
+
+func (a *AccountSource) SyncReservedFundBinance() error {
+	reserve, err := a.getReservedFund("binance")
+	if err != nil {
+		return err
+	}
+
+	a.BinanceFund.ReservedFund = reserve
+	return nil
+}
+
+// AvailableFund: Total amount of money (USDT/KRW) that is free to be reserved by containers.
+func (a *AccountSource) keyAvailableFund(exchange string) string {
+	return fmt.Sprintf("available_fund:%s", exchange)
+}
+
+func (a *AccountSource) SetAvailableFund(exchange string, amount float64) error {
+	key := a.keyAvailableFund(exchange)
+	return a.Redis.Set(a.ctx, key, amount, 0).Err()
+}
+
+func (a *AccountSource) getAvailableFund(exchange string) (float64, error) {
+	key := a.keyAvailableFund(exchange)
+	val, err := a.Redis.Get(a.ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(val, 64)
+}
+
+func (a *AccountSource) SyncAvailableFundUpbit() error {
+	fund, err := a.getAvailableFund("upbit")
+	if err != nil {
+		return err
+	}
+
+	a.UpbitFund.AvailableFund = fund
+	return nil
+}
+
+func (a *AccountSource) SyncAvailableFundBinance() error {
+	fund, err := a.getAvailableFund("binance")
+	if err != nil {
+		return err
+	}
+
+	a.BinanceFund.AvailableFund = fund
+	return nil
+}
+
+// Position: Total amount of money (USDT/KRW) that is reserved by containers.
+func (a *AccountSource) keyPosition(exchange, currency string) string {
+	return fmt.Sprintf("wallet:%s:%s", exchange, currency)
+}
+
+func (a *AccountSource) SetPosition(exchange, currency string, amount float64) error {
+	key := a.keyPosition(exchange, currency)
+	return a.Redis.Set(a.ctx, key, amount, 0).Err()
+}
+
+func (a *AccountSource) GetPosition(exchange, currency string) (float64, error) {
+	key := a.keyPosition(exchange, currency)
+	val, err := a.Redis.Get(a.ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(val, 64)
+}
+
+// WalletSnapshot: Snapshot of the wallet at startup.
+func (a *AccountSource) keyWalletSnapshot(exchange string) string {
+	return fmt.Sprintf("wallet_snapshot:%s", exchange)
+}
+
+func (a *AccountSource) SetWalletSnapshot(exchange string, snapshot map[string]float64) error {
+	key := a.keyWalletSnapshot(exchange)
+	return a.Redis.Set(a.ctx, key, snapshot, 0).Err()
+}
+
+func (a *AccountSource) GetWalletSnapshot(exchange string) (map[string]float64, error) {
+	key := a.keyWalletSnapshot(exchange)
+	val, err := a.Redis.Get(a.ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshot map[string]float64
+	if err := json.Unmarshal([]byte(val), &snapshot); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+func (a *AccountSource) SyncWalletSnapshotUpbit() error {
+	snapshot, err := a.GetWalletSnapshot("upbit")
+	if err != nil {
+		return err
+	}
+
+	a.upbitWalletSnapshot = snapshot
+	return nil
+}
+
+func (a *AccountSource) SyncWalletSnapshotBinance() error {
+	snapshot, err := a.GetWalletSnapshot("binance")
+	if err != nil {
+		return err
+	}
+
+	a.binanceWalletSnapshot = snapshot
+	return nil
 }
