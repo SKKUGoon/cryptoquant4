@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   redis:
     image: redis:latest
@@ -10,6 +12,8 @@ services:
       start_period: 30s
     ports:
       - 6379:6379
+    volumes:
+      - redis_data:/data
 
   xrp:
     build:
@@ -17,7 +21,7 @@ services:
       dockerfile: Dockerfile
       args:
         - BUILD_TAGS=server
-    container_name: cryptoquant_xrp
+    container_name: cryptoquant_xrp_dev
     depends_on:
       redis:
         condition: service_healthy
@@ -29,23 +33,26 @@ services:
       - .env
     environment:
       - ENGINE_NAME=xrp
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
+      - USERNAME=${USERNAME:-postgres}
+      - PASSWORD=${PASSWORD:-postgres}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_NAME=${PG_NAME:-cryptoquant}
+      - TS_HOST=timescaledb
+      - TS_PORT=5432
+      - TS_NAME=${TS_NAME:-cryptoquant_ts}
       - BINANCE_SYMBOL=XRPUSDT
       - UPBIT_SYMBOL=KRW-XRP
       - ANCHOR_SYMBOL=KRW-USDT
       - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
       - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY}
+      - UPBIT_API_KEY=${UPBIT_API_KEY}
     volumes:
       - ./log/xrp:/app/log
+      - .:/app
     networks:
-      - shared
+      - crypto-dev
     logging:
       driver: "json-file"
       options:
@@ -63,7 +70,7 @@ services:
       dockerfile: Dockerfile
       args:
         - BUILD_TAGS=server
-    container_name: cryptoquant_cow
+    container_name: cryptoquant_cow_dev
     depends_on:
       redis:
         condition: service_healthy
@@ -75,23 +82,26 @@ services:
       - .env
     environment:
       - ENGINE_NAME=cow
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
+      - USERNAME=${USERNAME:-postgres}
+      - PASSWORD=${PASSWORD:-postgres}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_NAME=${PG_NAME:-cryptoquant}
+      - TS_HOST=timescaledb
+      - TS_PORT=5432
+      - TS_NAME=${TS_NAME:-cryptoquant_ts}
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
       - ANCHOR_SYMBOL=KRW-USDT
       - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
       - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY}
+      - UPBIT_API_KEY=${UPBIT_API_KEY}
     volumes:
       - ./log/cow:/app/log
+      - .:/app
     networks:
-      - shared
+      - crypto-dev
     logging:
       driver: "json-file"
       options:
@@ -103,7 +113,12 @@ services:
           cpus: '1.0'
           memory: 512M
 
+volumes:
+  redis_data:
+  postgres_data:
+  timescaledb_data:
+
 networks:
-  shared:
+  crypto-dev:
     external: true
-    name: crypto-bridge
+    name: crypto-dev 

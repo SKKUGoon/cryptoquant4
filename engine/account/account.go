@@ -11,8 +11,8 @@ import (
 )
 
 type Account struct {
-	Balance      float64
-	QuotingAsset string
+	AvailableFund float64
+	QuotingAsset  string
 
 	listenKey       string
 	accountUpdateCh chan binancews.AccountUpdateEvent
@@ -45,11 +45,11 @@ func (a *Account) SetQuotingAsset(asset string) {
 	a.QuotingAsset = asset
 }
 
-func (a *Account) GetBalance() float64 {
+func (a *Account) GetAvailableFund() float64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	return a.Balance
+	return a.AvailableFund
 }
 
 func (a *Account) GetListenKey() string {
@@ -63,7 +63,7 @@ func (a *Account) Status() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	log.Printf("[account] status: %v", a.Balance)
+	log.Printf("[account] status: %v", a.AvailableFund)
 }
 
 func (a *Account) Run(done chan struct{}) {
@@ -88,7 +88,7 @@ func (a *Account) Run(done chan struct{}) {
 						log.Printf("Failed to parse balance: %v", err)
 						continue
 					}
-					a.Balance = balanceFloat
+					a.AvailableFund = balanceFloat
 				}
 			}
 		case <-done:
