@@ -1,5 +1,5 @@
-//go:build server
-// +build server
+//go:build server && !init
+// +build server,!init
 
 package main
 
@@ -23,8 +23,8 @@ func main() {
 	engine.ConfirmTradeParameters()
 
 	// Start all necessary components
-	engine.StartAsset()
-	engine.StartMonitor()
+	engine.StartAssetPair()
+	engine.StartAssetStreams()
 	engine.StartStrategy()
 	engine.StartTSLog()
 

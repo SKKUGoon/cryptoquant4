@@ -11,6 +11,20 @@ services:
     ports:
       - 6379:6379
 
+  cryptoquant_init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_TAGS=init
+    container_name: cryptoquant_init
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: "no"
+    env_file:
+      - .env
+
   xrp:
     build:
       context: .

@@ -15,21 +15,27 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application with server tag
+# Build the application with specified tags
 ARG BUILD_TAGS=server
-RUN CGO_ENABLED=0 GOOS=linux go build -tags ${BUILD_TAGS} -o cryptoquant-server .
+RUN CGO_ENABLED=0 GOOS=linux go build -tags ${BUILD_TAGS} -o /app/cryptoquant-server .
 
 # Final stage
 FROM alpine:latest
 
 WORKDIR /app
 
+# Create user before referencing it
+RUN adduser -D -g '' appuser
+
 # Copy the binary from builder
-COPY --from=builder /app/cryptoquant-server .
+COPY --from=builder /app/cryptoquant-server /app/
+
+# Add this line to set correct owner
+RUN chown appuser:appuser /app/cryptoquant-server
+
 
 # Create a non-root user and set up permissions
-RUN adduser -D -g '' appuser && \
-    mkdir -p /app/log && \
+RUN mkdir -p /app/log && \
     chown -R appuser:appuser /app/log && \
     chmod 755 /app/log
 

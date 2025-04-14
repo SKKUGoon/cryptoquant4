@@ -1,5 +1,5 @@
-//go:build !server
-// +build !server
+//go:build !server && !init
+// +build !server,!init
 
 package main
 

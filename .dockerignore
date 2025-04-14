@@ -1,0 +1,6 @@
+.git
+*.log
+*.sqlite
+.env
+bin/
+log/

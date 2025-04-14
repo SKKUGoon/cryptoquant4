@@ -1,8 +1,7 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:latest
+    container_name: redis
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -14,17 +13,37 @@ services:
       - 6379:6379
     volumes:
       - redis_data:/data
+    networks:
+      - crypto-dev
+
+  cryptoquant_init:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        - BUILD_TAGS=init
+    container_name: cryptoquant_init
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: "no"
+    env_file:
+      - .env
+    networks:
+      - crypto-dev
 
   xrp:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       args:
         - BUILD_TAGS=server
     container_name: cryptoquant_xrp_dev
     depends_on:
       redis:
         condition: service_healthy
+      cryptoquant_init:
+        condition: service_completed_successfully
     restart: unless-stopped
     labels:
       engine: xrp
@@ -35,11 +54,11 @@ services:
       - ENGINE_NAME=xrp
       - USERNAME=${USERNAME:-postgres}
       - PASSWORD=${PASSWORD:-postgres}
-      - PG_HOST=postgres
-      - PG_PORT=5432
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
       - PG_NAME=${PG_NAME:-cryptoquant}
-      - TS_HOST=timescaledb
-      - TS_PORT=5432
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
       - TS_NAME=${TS_NAME:-cryptoquant_ts}
       - BINANCE_SYMBOL=XRPUSDT
       - UPBIT_SYMBOL=KRW-XRP
@@ -67,13 +86,15 @@ services:
   cow:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       args:
         - BUILD_TAGS=server
     container_name: cryptoquant_cow_dev
     depends_on:
       redis:
         condition: service_healthy
+      cryptoquant_init:
+        condition: service_completed_successfully
     restart: unless-stopped
     labels:
       engine: cow
@@ -84,11 +105,11 @@ services:
       - ENGINE_NAME=cow
       - USERNAME=${USERNAME:-postgres}
       - PASSWORD=${PASSWORD:-postgres}
-      - PG_HOST=postgres
-      - PG_PORT=5432
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
       - PG_NAME=${PG_NAME:-cryptoquant}
-      - TS_HOST=timescaledb
-      - TS_PORT=5432
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
       - TS_NAME=${TS_NAME:-cryptoquant_ts}
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
