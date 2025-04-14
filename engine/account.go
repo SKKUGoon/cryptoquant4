@@ -55,7 +55,7 @@ type Fund struct {
 
 func NewAccountSource(ctx context.Context) *AccountSource {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "redis:6379",
+		Addr:     "127.0.0.1:6379",
 		Password: "",
 		DB:       0,
 	})
@@ -264,7 +264,11 @@ func (a *AccountSource) keyWalletSnapshot(exchange string) string {
 
 func (a *AccountSource) SetWalletSnapshot(exchange string, snapshot map[string]float64) error {
 	key := a.keyWalletSnapshot(exchange)
-	return a.Redis.Set(a.ctx, key, snapshot, 0).Err()
+	json, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return a.Redis.Set(a.ctx, key, json, 0).Err()
 }
 
 func (a *AccountSource) GetWalletSnapshot(exchange string) (map[string]float64, error) {
