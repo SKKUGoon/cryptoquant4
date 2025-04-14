@@ -67,9 +67,6 @@ services:
       - BINANCE_API_KEY=${BINANCE_API_KEY}
       - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY}
       - UPBIT_API_KEY=${UPBIT_API_KEY}
-    volumes:
-      - ./log/xrp:/app/log
-      - .:/app
     networks:
       - crypto-dev
     logging:
@@ -118,9 +115,6 @@ services:
       - BINANCE_API_KEY=${BINANCE_API_KEY}
       - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY}
       - UPBIT_API_KEY=${UPBIT_API_KEY}
-    volumes:
-      - ./log/cow:/app/log
-      - .:/app
     networks:
       - crypto-dev
     logging:
@@ -133,11 +127,6 @@ services:
         limits:
           cpus: '1.0'
           memory: 512M
-
-volumes:
-  redis_data:
-  postgres_data:
-  timescaledb_data:
 
 networks:
   crypto-dev:
