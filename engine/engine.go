@@ -43,7 +43,8 @@ type EngineContext struct {
 	KimchiTrader  *upbittrade.Trader
 	BinanceTrader *binancetrade.Trader
 
-	// Accounts
+	// Accounts - One true source
+	AccountSource *AccountSource
 
 	// Data
 	Database         *database.Database
@@ -159,7 +160,7 @@ func New(ctx context.Context) *EngineContext {
 	kimchiTrader := upbittrade.NewTrader()
 	binanceTrader := binancetrade.NewTrader()
 
-	// 8. Set order channels
+	// 8. Create struct with order channels
 	engine := &EngineContext{
 		EngineName:            engineName,
 		ctx:                   engineCtx,

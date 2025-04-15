@@ -32,6 +32,7 @@ func init() {
 
 	// Enable more verbose logging for development
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Println("Starting development environment...")
 }
 
 func main() {
@@ -44,7 +45,6 @@ func main() {
 	engine.ConfirmTradeParameters()
 
 	// Start all components with development logging
-	log.Println("Starting development environment...")
 	engine.StartAssetPair()
 	engine.StartAssetStreams()
 	engine.StartStrategy()
