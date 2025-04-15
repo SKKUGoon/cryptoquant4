@@ -7,7 +7,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/redis/go-redis/v9"
+	"cryptoquant.com/m/engine"
 )
 
 // Synchronize the redis database with the api information.
@@ -15,16 +15,8 @@ import (
 func main() {
 	ctx := context.Background()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "redis:6379",
-		Password: "",
-		DB:       0,
-	})
-
-	// Check Redis connectivity
-	pong, err := rdb.Ping(ctx).Result()
-	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+	as := engine.NewAccountSource(ctx)
+	if err := as.OnInit(); err != nil {
+		log.Fatalf("failed to init account source: %v", err)
 	}
-	log.Printf("Redis connected: %s", pong)
 }
