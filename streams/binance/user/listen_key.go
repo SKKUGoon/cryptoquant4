@@ -8,10 +8,12 @@ import (
 	binancews "cryptoquant.com/m/internal/binance/ws"
 )
 
+const listenKeyURL = "https://fapi.binance.com/fapi/v1/listenKey"
+
 // CreateListenKey creates a listen key for user data stream
 func CreateListenKey() (string, error) {
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://fapi.binance.com/fapi/v1/listenKey", nil)
+	req, err := http.NewRequest("POST", listenKeyURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -35,7 +37,7 @@ func CreateListenKey() (string, error) {
 
 func KeepAliveListenKey(listenKey string) error {
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "https://fapi.binance.com/fapi/v1/listenKey", nil)
+	req, err := http.NewRequest("PUT", listenKeyURL, nil)
 	if err != nil {
 		return err
 	}
@@ -54,7 +56,7 @@ func KeepAliveListenKey(listenKey string) error {
 
 func CloseListenKey(listenKey string) error {
 	client := &http.Client{}
-	req, err := http.NewRequest("DELETE", "https://fapi.binance.com/fapi/v1/listenKey", nil)
+	req, err := http.NewRequest("DELETE", listenKeyURL, nil)
 	if err != nil {
 		return err
 	}

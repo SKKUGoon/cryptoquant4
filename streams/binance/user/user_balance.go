@@ -13,9 +13,10 @@ import (
 // SubscribeBalance subscribes to the balance stream for a given listen key
 // and sends the data to the channel
 func SubscribeBalance(listenKey string, ch chan binancews.AccountUpdateEvent, done chan struct{}) error {
-	urlBase := "wss://fstream.binance.com/ws/"
-	url := urlBase + listenKey
+	const urlBase = "wss://fstream.binance.com/ws/"
+	var streamData binancews.AccountUpdateEvent
 
+	url := urlBase + listenKey
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("websocket connection failed: %v", err)
@@ -24,7 +25,6 @@ func SubscribeBalance(listenKey string, ch chan binancews.AccountUpdateEvent, do
 
 	log.Printf("Connected to Binance Futures user stream for %s", listenKey)
 
-	var streamData binancews.AccountUpdateEvent
 	for {
 		select {
 		case <-done:

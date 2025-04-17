@@ -13,10 +13,10 @@ import (
 )
 
 func SubscribeAggtrade(ctx context.Context, symbol string, handlers []func(binancews.FutureAggTrade) error) error {
+	var streamData binancews.Stream[binancews.FutureAggTrade]
+
 	// Binance Futures Websocket endpoint
 	url := fmt.Sprintf("wss://fstream.binance.com/stream?streams=%s@aggTrade", strings.ToLower(symbol))
-
-	// Connect to Websocket
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("websocket connection failed: %v", err)
@@ -25,7 +25,6 @@ func SubscribeAggtrade(ctx context.Context, symbol string, handlers []func(binan
 
 	log.Printf("Connected to Binance Futures aggtrade stream for %s", symbol)
 
-	var streamData binancews.Stream[binancews.FutureAggTrade]
 	for {
 		select {
 		case <-ctx.Done():

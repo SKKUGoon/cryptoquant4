@@ -90,12 +90,12 @@ func SubscribeMyAsset(ctx context.Context, handlers []func(upbitws.MyAssetRespon
 		}
 	}()
 
+	var myAsset upbitws.MyAssetResponse
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			var myAsset upbitws.MyAssetResponse
 			if err := conn.ReadJSON(&myAsset); err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("WebSocket closed unexpectedly: %v", err)

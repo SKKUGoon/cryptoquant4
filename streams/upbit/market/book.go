@@ -13,6 +13,12 @@ import (
 )
 
 func SubscribeBook(ctx context.Context, symbol string, handlers []func(upbitws.SpotOrderbook) error) error {
+	const url = "wss://api.upbit.com/websocket/v1"
+	var conn *websocket.Conn
+	var err error
+	var orderbook upbitws.SpotOrderbook
+	var backoff = initialBackoff
+
 	// Add random delay before initial connection attempt
 	initialDelay := time.Duration(rand.Int63n(int64(maxInitialDelay)))
 	log.Printf("Waiting %v before initial connection attempt for %s", initialDelay, symbol)
@@ -24,20 +30,13 @@ func SubscribeBook(ctx context.Context, symbol string, handlers []func(upbitws.S
 		// Continue with connection attempt
 	}
 
-	// Upbit Websocket endpoint
-	url := "wss://api.upbit.com/websocket/v1"
-
-	var conn *websocket.Conn
-	var err error
-	backoff := initialBackoff
-
+	// Retry connection with exponential backoff
 	for retry := range maxRetries {
 		if conn, _, err = websocket.DefaultDialer.Dial(url, nil); err == nil {
 			break
 		}
 
 		log.Printf("WebSocket connection attempt %d/%d failed: %v", retry+1, maxRetries, err)
-
 		backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
 
 		select {
@@ -73,9 +72,9 @@ func SubscribeBook(ctx context.Context, symbol string, handlers []func(upbitws.S
 		return fmt.Errorf("failed to send subscription message: %v", err)
 	}
 
+	// Upbit requires a ping from the client every 2 minutes. - 40 seconds to be safe
 	pingTicker := time.NewTicker(40 * time.Second)
 	defer pingTicker.Stop()
-
 	go func() {
 		for {
 			select {
@@ -98,7 +97,6 @@ func SubscribeBook(ctx context.Context, symbol string, handlers []func(upbitws.S
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			var orderbook upbitws.SpotOrderbook
 			if err := conn.ReadJSON(&orderbook); err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("WebSocket closed unexpectedly: %v", err)

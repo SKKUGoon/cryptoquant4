@@ -14,11 +14,11 @@ import (
 )
 
 func SubscribeKline(ctx context.Context, symbol, interval string, handlers []func(binancews.KlineDataStream) error) error {
+	var streamData binancews.Stream[binancews.KlineDataStream]
+
 	// Binance Futures WebSocket endpoint
 	url := fmt.Sprintf("wss://fstream.binance.com/stream?streams=%s@kline_%s",
 		strings.ToLower(symbol), interval)
-
-	// Connect to WebSocket
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("websocket connection failed: %v", err)
@@ -27,7 +27,6 @@ func SubscribeKline(ctx context.Context, symbol, interval string, handlers []fun
 
 	log.Printf("Connected to Binance Futures kline stream for %s", symbol)
 
-	var streamData binancews.Stream[binancews.KlineDataStream]
 	for {
 		select {
 		case <-ctx.Done():

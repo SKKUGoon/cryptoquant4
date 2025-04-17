@@ -21,6 +21,12 @@ const (
 )
 
 func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.SpotTrade) error) error {
+	const url = "wss://api.upbit.com/websocket/v1"
+	var conn *websocket.Conn
+	var err error
+	var trade upbitws.SpotTrade
+	var backoff = initialBackoff
+
 	// Add random delay before initial connection attempt
 	initialDelay := time.Duration(rand.Int63n(int64(maxInitialDelay)))
 	log.Printf("Waiting %v before initial connection attempt for %s", initialDelay, symbol)
@@ -32,13 +38,6 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 		// Continue with connection attempt
 	}
 
-	// Upbit Websocket endpoint
-	url := "wss://api.upbit.com/websocket/v1"
-
-	var conn *websocket.Conn
-	var err error
-	backoff := initialBackoff
-
 	// Retry connection with exponential backoff
 	for retry := range maxRetries {
 		if conn, _, err = websocket.DefaultDialer.Dial(url, nil); err == nil {
@@ -46,8 +45,6 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 		}
 
 		log.Printf("WebSocket connection attempt %d/%d failed: %v", retry+1, maxRetries, err)
-
-		// Calculate next backoff duration with exponential increase
 		backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
 
 		// Wait for backoff period or context cancellation
@@ -66,7 +63,6 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 
 	log.Printf("Connected to Upbit trade stream for %s", symbol)
 
-	// Create subscription message with three segments
 	subscriptionMessage := upbitws.SubscriptionMessage{
 		upbitws.SubscriptionMessageTicket{
 			Ticket: "trade_subscription_" + time.Now().Format("20060102") + "_" + symbol,
@@ -85,11 +81,9 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 		return fmt.Errorf("failed to send subscription message: %v", err)
 	}
 
-	// Create ping ticker
+	// Upbit requires a ping from the client every 2 minutes. - 40 seconds to be safe
 	pingTicker := time.NewTicker(40 * time.Second)
 	defer pingTicker.Stop()
-
-	// Start ping loop in a separate goroutine
 	go func() {
 		for {
 			select {
@@ -109,13 +103,11 @@ func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.
 		}
 	}()
 
-	// Read messages
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			var trade upbitws.SpotTrade
 			if err := conn.ReadJSON(&trade); err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("WebSocket closed unexpectedly: %v", err)

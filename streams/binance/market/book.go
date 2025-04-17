@@ -14,10 +14,10 @@ import (
 )
 
 func SubscribeBook(ctx context.Context, symbol string, handlers []func(binancews.FutureBookTicker) error) error {
+	var streamData binancews.Stream[binancews.FutureBookTicker]
+
 	// Binance Futures Websocket endpoint
 	url := fmt.Sprintf("wss://fstream.binance.com/stream?streams=%s@bookTicker", strings.ToLower(symbol))
-
-	// Connect to Websocket
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("websocket connection failed: %v", err)
@@ -26,7 +26,6 @@ func SubscribeBook(ctx context.Context, symbol string, handlers []func(binancews
 
 	log.Printf("Connected to Binance Futures book stream for %s", symbol)
 
-	var streamData binancews.Stream[binancews.FutureBookTicker]
 	for {
 		select {
 		case <-ctx.Done():
