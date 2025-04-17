@@ -3,13 +3,18 @@ package kimchiarb
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"sync"
 	"time"
 
 	"cryptoquant.com/m/data/database"
+	binancerest "cryptoquant.com/m/internal/binance/rest"
+	upbitrest "cryptoquant.com/m/internal/upbit/rest"
+	"github.com/shopspring/decimal"
 )
 
-type KimchiPremium struct {
+type UpbitBinancePremium struct {
 	mu          sync.Mutex
 	KimchiAsset *Asset
 	AnchorAsset *Asset // USDTKRW
@@ -33,7 +38,7 @@ type KimchiPremium struct {
 	KimchiBestAskQty float64 // Calculate how much market can take
 }
 
-func (p *KimchiPremium) Run(ctx context.Context) {
+func (p *UpbitBinancePremium) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,7 +105,7 @@ func (p *KimchiPremium) Run(ctx context.Context) {
 	}
 }
 
-func (p *KimchiPremium) Status() (bool, string) {
+func (p *UpbitBinancePremium) Status() (bool, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
@@ -112,19 +117,64 @@ func (p *KimchiPremium) Status() (bool, string) {
 	)
 }
 
-func (p *KimchiPremium) CheckEnter(enter float64) bool {
+func (p *UpbitBinancePremium) CheckEnter(enter float64) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.PremiumEnterPos < enter
 }
 
-func (p *KimchiPremium) CheckExit(exit float64) bool {
+func (p *UpbitBinancePremium) CreatePremiumLongOrders(longFund, shortFund float64) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Calculate the maximum amount
+	// Long and Short should equal in fund - to gurantee perfect delta hedge
+	// Use only 80% of the minimum of the best bid and best ask quantity.
+	// For example:
+	// - If upbit's best ask's quantity is 1000
+	//      binance's best bid's quantity is 900
+	//   Then, we can only use 900 * 0.8 = 720
+	longEnter := math.Min(p.KimchiBestAskQty*p.KimchiBestAsk, longFund) // In KRW
+	shortEnter := math.Min(p.CefiBestBidQty*p.CefiBestBid, shortFund)   // In USDT
+
+	enterFundUSDT := math.Min(shortEnter, longEnter*p.AnchorPrice) * 0.8 // In USDT
+	enterFundKRW := enterFundUSDT / p.AnchorPrice                        // In KRW. Upbit requires Price * Quantity in Price
+
+	// Upbit is always long - market order
+	upbitOrderSheet := upbitrest.OrderSheet{
+		Symbol:  p.KimchiAsset.Symbol,
+		Side:    "bid",
+		Price:   strconv.FormatFloat(enterFundKRW, 'f', -1, 64),
+		OrdType: "price", // Market order
+	}
+
+	// Binance is always short - market order
+	binanceOrderSheet := binancerest.OrderSheet{
+		Symbol:       p.CefiAsset.Symbol,
+		Side:         "SELL",
+		PositionSide: "BOTH", // for One way mode.
+		Type:         "MARKET",
+		Quantity:     decimal.NewFromFloat(enterFundUSDT / p.CefiBestBid),
+	}
+	return upbitOrderSheet, binanceOrderSheet, nil
+}
+
+func (p *UpbitBinancePremium) CreatePremiumShortOrders(symbol string) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	upbitOrderSheet := upbitrest.OrderSheet{}
+	binanceOrderSheet := binancerest.OrderSheet{}
+	return upbitOrderSheet, binanceOrderSheet, nil
+}
+
+func (p *UpbitBinancePremium) CheckExit(exit float64) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.PremiumExitPos > exit
 }
 
-func (p *KimchiPremium) ToPremiumLog() database.PremiumLog {
+func (p *UpbitBinancePremium) ToPremiumLog() database.PremiumLog {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return database.PremiumLog{
@@ -143,7 +193,7 @@ func (p *KimchiPremium) ToPremiumLog() database.PremiumLog {
 	}
 }
 
-func (p *KimchiPremium) calculatePremium() {
+func (p *UpbitBinancePremium) calculatePremium() {
 	if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
 		return
 	}
@@ -155,7 +205,7 @@ func (p *KimchiPremium) calculatePremium() {
 	p.Premium = premium
 }
 
-func (p *KimchiPremium) calculatePremiumEnterPos() {
+func (p *UpbitBinancePremium) calculatePremiumEnterPos() {
 	if p.KimchiBestAsk == 0 || p.CefiBestBid == 0 || p.AnchorPrice == 0 {
 		return
 	}
@@ -166,7 +216,7 @@ func (p *KimchiPremium) calculatePremiumEnterPos() {
 	p.PremiumEnterPos = premium
 }
 
-func (p *KimchiPremium) calculatePremiumExitPos() {
+func (p *UpbitBinancePremium) calculatePremiumExitPos() {
 	if p.KimchiBestBid == 0 || p.CefiBestAsk == 0 || p.AnchorPrice == 0 {
 		return
 	}
@@ -177,7 +227,7 @@ func (p *KimchiPremium) calculatePremiumExitPos() {
 	p.PremiumExitPos = premium
 }
 
-func (p *KimchiPremium) GetPremium() float64 {
+func (p *UpbitBinancePremium) GetPremium() float64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.Premium
