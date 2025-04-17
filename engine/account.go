@@ -119,12 +119,25 @@ func NewAccountSourceSync(ctx context.Context) *AccountSource {
 		upbitPubkey: upbitPubkey,
 		upbitPrikey: upbitPrikey,
 	}
-	as.SyncAvailableFundUpbit()
-	as.SyncAvailableFundBinance()
-	as.SyncReservedFundUpbit()
-	as.SyncReservedFundBinance()
-	as.SyncWalletSnapshotUpbit()
-	as.SyncWalletSnapshotBinance()
+
+	if err := as.SyncAvailableFundUpbit(); err != nil {
+		log.Fatalf("Failed to sync Upbit available fund: %v", err)
+	}
+	if err := as.SyncAvailableFundBinance(); err != nil {
+		log.Fatalf("Failed to sync Binance available fund: %v", err)
+	}
+	if err := as.SyncReservedFundUpbit(); err != nil {
+		log.Fatalf("Failed to sync Upbit reserved fund: %v", err)
+	}
+	if err := as.SyncReservedFundBinance(); err != nil {
+		log.Fatalf("Failed to sync Binance reserved fund: %v", err)
+	}
+	if err := as.SyncWalletSnapshotUpbit(); err != nil {
+		log.Fatalf("Failed to sync Upbit wallet snapshot: %v", err)
+	}
+	if err := as.SyncWalletSnapshotBinance(); err != nil {
+		log.Fatalf("Failed to sync Binance wallet snapshot: %v", err)
+	}
 
 	return as
 }
@@ -145,9 +158,32 @@ func (a *AccountSource) OnInit() error {
 	return nil
 }
 
-func (a *AccountSource) OnUpdate() error {
-	log.Println("Account: Redis -> Upbit. Fund synced")
-	log.Println("Account: Redis -> Binance. Fund synced")
+func (a *AccountSource) Update() error {
+	// Save to redis
+	log.Println("Account: Upbit -> Redis. Fund synced")
+	a.upbitFundSync()
+	log.Println("Account: Binance -> Redis. Fund synced")
+	a.binanceFundSync()
+
+	// Update internal fund
+	if err := a.SyncAvailableFundUpbit(); err != nil {
+		return fmt.Errorf("failed to sync Upbit available fund: %v", err)
+	}
+	if err := a.SyncAvailableFundBinance(); err != nil {
+		return fmt.Errorf("failed to sync Binance available fund: %v", err)
+	}
+	if err := a.SyncReservedFundUpbit(); err != nil {
+		return fmt.Errorf("failed to sync Upbit reserved fund: %v", err)
+	}
+	if err := a.SyncReservedFundBinance(); err != nil {
+		return fmt.Errorf("failed to sync Binance reserved fund: %v", err)
+	}
+	if err := a.SyncWalletSnapshotUpbit(); err != nil {
+		return fmt.Errorf("failed to sync Upbit wallet snapshot: %v", err)
+	}
+	if err := a.SyncWalletSnapshotBinance(); err != nil {
+		return fmt.Errorf("failed to sync Binance wallet snapshot: %v", err)
+	}
 
 	return nil
 }
@@ -216,10 +252,10 @@ func (a *AccountSource) upbitFundSync() error {
 		// Save KRW available to internal fund
 		if currency == "KRW" {
 			a.UpbitFund.AvailableFund = balance
-			if err := a.SetAvailableFund("upbit", balance-reserved); err != nil {
+			if err := a.setRedisAvailableFund("upbit", balance-reserved); err != nil {
 				return err
 			}
-			if err := a.SetReservedFund("upbit", reserved); err != nil {
+			if err := a.syncRedisReservedFund("upbit", reserved); err != nil {
 				return err
 			}
 		}
@@ -305,10 +341,10 @@ func (a *AccountSource) binanceFundSync() error {
 
 		if asset.Asset == "USDT" {
 			a.BinanceFund.AvailableFund = available
-			if err := a.SetAvailableFund("binance", available); err != nil {
+			if err := a.setRedisAvailableFund("binance", available); err != nil {
 				return err
 			}
-			if err := a.SetReservedFund("binance", total-available); err != nil {
+			if err := a.syncRedisReservedFund("binance", total-available); err != nil {
 				return err
 			}
 		}
@@ -340,12 +376,14 @@ func (a *AccountSource) keyReservedFund(exchange string) string {
 	return fmt.Sprintf("reserved_fund:%s", exchange)
 }
 
-func (a *AccountSource) SetReservedFund(exchange string, amount float64) error {
+// Exchange -> Redis
+func (a *AccountSource) syncRedisReservedFund(exchange string, amount float64) error {
 	key := a.keyReservedFund(exchange)
 	return a.Redis.Set(a.ctx, key, amount, 0).Err()
 }
 
-func (a *AccountSource) getReservedFund(exchange string) (float64, error) {
+// Redis -> Go
+func (a *AccountSource) syncGoReservedFund(exchange string) (float64, error) {
 	key := a.keyReservedFund(exchange)
 	val, err := a.Redis.Get(a.ctx, key).Result()
 	if err != nil {
@@ -354,8 +392,9 @@ func (a *AccountSource) getReservedFund(exchange string) (float64, error) {
 	return strconv.ParseFloat(val, 64)
 }
 
+// Redis -> UpbitFund.ReservedFund
 func (a *AccountSource) SyncReservedFundUpbit() error {
-	reserve, err := a.getReservedFund("upbit")
+	reserve, err := a.syncGoReservedFund("upbit")
 	if err != nil {
 		return err
 	}
@@ -364,8 +403,9 @@ func (a *AccountSource) SyncReservedFundUpbit() error {
 	return nil
 }
 
+// Redis -> BinanceFund.ReservedFund
 func (a *AccountSource) SyncReservedFundBinance() error {
-	reserve, err := a.getReservedFund("binance")
+	reserve, err := a.syncGoReservedFund("binance")
 	if err != nil {
 		return err
 	}
@@ -379,12 +419,14 @@ func (a *AccountSource) keyAvailableFund(exchange string) string {
 	return fmt.Sprintf("available_fund:%s", exchange)
 }
 
-func (a *AccountSource) SetAvailableFund(exchange string, amount float64) error {
+// Exchange -> Redis
+func (a *AccountSource) setRedisAvailableFund(exchange string, amount float64) error {
 	key := a.keyAvailableFund(exchange)
 	return a.Redis.Set(a.ctx, key, amount, 0).Err()
 }
 
-func (a *AccountSource) getAvailableFund(exchange string) (float64, error) {
+// Redis -> Go
+func (a *AccountSource) syncGoAvailableFund(exchange string) (float64, error) {
 	key := a.keyAvailableFund(exchange)
 	val, err := a.Redis.Get(a.ctx, key).Result()
 	if err != nil {
@@ -393,8 +435,9 @@ func (a *AccountSource) getAvailableFund(exchange string) (float64, error) {
 	return strconv.ParseFloat(val, 64)
 }
 
+// Redis -> UpbitFund.AvailableFund
 func (a *AccountSource) SyncAvailableFundUpbit() error {
-	fund, err := a.getAvailableFund("upbit")
+	fund, err := a.syncGoAvailableFund("upbit")
 	if err != nil {
 		return err
 	}
@@ -403,8 +446,9 @@ func (a *AccountSource) SyncAvailableFundUpbit() error {
 	return nil
 }
 
+// Redis -> BinanceFund.AvailableFund
 func (a *AccountSource) SyncAvailableFundBinance() error {
-	fund, err := a.getAvailableFund("binance")
+	fund, err := a.syncGoAvailableFund("binance")
 	if err != nil {
 		return err
 	}
