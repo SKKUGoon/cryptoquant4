@@ -19,7 +19,7 @@ import (
 	binancews "cryptoquant.com/m/internal/binance/ws"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
 	upbitws "cryptoquant.com/m/internal/upbit/ws"
-	kimchiarb "cryptoquant.com/m/strategy/arbitrage/kimchi"
+	kimchiarbv1 "cryptoquant.com/m/strategy/arbitrage/kimchi_v1"
 	binancemarket "cryptoquant.com/m/streams/binance/market"
 	upbitmarket "cryptoquant.com/m/streams/upbit/market"
 )
@@ -52,7 +52,7 @@ type EngineContext struct {
 	FutureMarketData *binancesource.BinanceFutureMarketData
 
 	// Strategy
-	UpbitBinancePairs    *kimchiarb.UpbitBinancePremium
+	UpbitBinancePairs    *kimchiarbv1.UpbitBinancePair
 	EnterPremiumBoundary float64
 	ExitPremiumBoundary  float64
 
@@ -283,9 +283,9 @@ func (e *EngineContext) ConfirmTradeParameters() {
 // 3. AnchorAsset: Represents the anchor trading pair
 func (e *EngineContext) StartAssetPair() {
 	e.logger.Printf("Starting asset for %v", e.UpbitAssetSymbol)
-	kimchiAsset := kimchiarb.NewAsset(e.UpbitAssetSymbol)
-	forexAsset := kimchiarb.NewAsset(e.BinanceAssetSymbol)
-	anchorAsset := kimchiarb.NewAsset(e.AnchorAssetSymbol)
+	kimchiAsset := kimchiarbv1.NewAsset(e.UpbitAssetSymbol)
+	forexAsset := kimchiarbv1.NewAsset(e.BinanceAssetSymbol)
+	anchorAsset := kimchiarbv1.NewAsset(e.AnchorAssetSymbol)
 
 	kimchiAsset.SetPriceChannel(e.upbitTradeChan)
 	forexAsset.SetPriceChannel(e.binanceTradeChan)
@@ -307,7 +307,7 @@ func (e *EngineContext) StartAssetPair() {
 	forexAsset.SetBestAskQtyChannel(e.binanceBestAskQtyChan)
 	anchorAsset.SetBestAskQtyChannel(e.anchorBestAskQtyChan)
 
-	e.UpbitBinancePairs = &kimchiarb.UpbitBinancePremium{
+	e.UpbitBinancePairs = &kimchiarbv1.UpbitBinancePair{
 		AnchorAsset: anchorAsset,
 		CefiAsset:   forexAsset,
 		KimchiAsset: kimchiAsset,
@@ -367,6 +367,12 @@ func (e *EngineContext) StartStrategy() {
 	const maxConsecutiveFailures = 5000 // Adjust this threshold as needed
 
 	go func() {
+		var entryUpbitOrderSheet upbitrest.OrderSheet // Long
+		// var exitUpbitOrderSheet upbitrest.OrderSheet      // Exit position
+		var entryBinanceOrderSheet binancerest.OrderSheet // Short
+		// var exitBinanceOrderSheet binancerest.OrderSheet  // Exit position
+		var err error
+
 		for {
 			select {
 			case <-e.ctx.Done():
@@ -393,15 +399,16 @@ func (e *EngineContext) StartStrategy() {
 
 				// Check the premium boundary
 				if e.inPosition && e.UpbitBinancePairs.CheckExit(e.ExitPremiumBoundary) {
+					e.logger.Printf("Exiting position")
 					// e.orderChan <- "exit"
 					// TODO: Implement this
-					e.logger.Printf("Exiting position")
 					e.AccountSource.Update()
 					e.logger.Printf("Account updated")
 				} else if !e.inPosition && e.UpbitBinancePairs.CheckEnter(e.EnterPremiumBoundary) {
 					e.logger.Printf("Entering position")
+
 					// Create order sheets
-					upbitOrderSheet, binanceOrderSheet, err := e.UpbitBinancePairs.CreatePremiumLongOrders(
+					entryUpbitOrderSheet, entryBinanceOrderSheet, err = e.UpbitBinancePairs.CreatePremiumLongOrders(
 						e.AccountSource.UpbitFund.AvailableFund,
 						e.AccountSource.BinanceFund.AvailableFund,
 					)
@@ -411,15 +418,19 @@ func (e *EngineContext) StartStrategy() {
 					}
 
 					// Audit order sheet precision
-					// e.KimchiExchangeConfig.AuditOrderSheetPrecision(&upbitOrderSheet)
-					err = e.BinanceExchangeConfig.AuditOrderSheetPrecision(&binanceOrderSheet)
+					err = e.UpbitExchangeConfig.AuditOrderSheetPrecision(&entryUpbitOrderSheet)
+					if err != nil {
+						e.logger.Printf("Failed to audit order sheet precision: %v", err)
+						continue
+					}
+					err = e.BinanceExchangeConfig.AuditOrderSheetPrecision(&entryBinanceOrderSheet)
 					if err != nil {
 						e.logger.Printf("Failed to audit order sheet precision: %v", err)
 						continue
 					}
 
-					fmt.Printf("%+v\n", upbitOrderSheet)
-					fmt.Printf("%+v\n", binanceOrderSheet)
+					fmt.Printf("%+v\n", entryUpbitOrderSheet)
+					fmt.Printf("%+v\n", entryBinanceOrderSheet)
 
 					// Send order sheets
 					// upbitResult, err := e.KimchiTrader.SendOrder(upbitOrderSheet)

@@ -141,40 +141,50 @@ func (e *UpbitSpotTradeConfig) IsAvailableSymbol(symbol string) bool {
 	return e.ExchangeInfo.IsSymbolAvailable(symbol)
 }
 
-// func (e *UpbitSpotTradeConfig) AuditOrderSheetPrecision(orderSheet *upbitrest.OrderSheet) error {
+func (e *UpbitSpotTradeConfig) AuditOrderSheetPrecision(orderSheet *upbitrest.OrderSheet) error {
+	// NOTE: Upbit does not have precision for each symbol
+	// NOTE: Upbit ordersheet only requires total amount of money you want to spend
 
-// 	symbolAffiliation := func(symbol string) string {
-// 		if e.UpbitPrecition.KrwOneSymbols[symbol] {
-// 			return "UPBIT_KRW_ONE" // Special case for Upbit. Its precision is set
-// 		}
+	// symbolAffiliation := func(symbol string) string {
+	// 	if e.UpbitPrecition.KrwOneSymbols[symbol] {
+	// 		return "UPBIT_KRW_ONE" // Special case for Upbit. Its precision is set
+	// 	}
 
-// 		if e.UpbitPrecition.KrwPointFiveSymbols[symbol] {
-// 			return "UPBIT_KRW_POINT_FIVE"
-// 		}
+	// 	if e.UpbitPrecition.KrwPointFiveSymbols[symbol] {
+	// 		return "UPBIT_KRW_POINT_FIVE"
+	// 	}
 
-// 		return "NORMAL"
-// 	}
+	// 	return "NORMAL"
+	// }
 
-// 	// Audit symbol precision
-// 	switch symbolAffiliation(orderSheet.Symbol) {
-// 	case "UPBIT_KRW_ONE":
-// 		pricePrecision := 1
-// 		if !orderSheet.Price.IsZero() {
-// 			roundedPrice := orderSheet.Price.Round(int32(pricePrecision))
-// 			orderSheet.Price = roundedPrice
-// 		}
-// 	case "UPBIT_KRW_POINT_FIVE":
-// 		if !orderSheet.Price.IsZero() {
-// 			// Multiply by 2 to work with whole numbers
-// 			scaled := orderSheet.Price.Mul(decimal.NewFromFloat(2))
-// 			// Round to nearest integer
-// 			rounded := scaled.Round(0)
-// 			// Divide by 2 to get back to 0.5 precision
-// 			orderSheet.Price = rounded.Div(decimal.NewFromFloat(2))
-// 		}
-// 	default:
-// 		return nil
-// 	}
+	// // Audit symbol precision
+	// switch symbolAffiliation(orderSheet.Symbol) {
+	// case "UPBIT_KRW_ONE":
+	// 	pricePrecision := 1
+	// 	if orderSheet.Price != "" {
+	// 		price, err := decimal.NewFromString(orderSheet.Price)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		roundedPrice := price.Round(int32(pricePrecision))
+	// 		orderSheet.Price = roundedPrice.String()
+	// 	}
+	// case "UPBIT_KRW_POINT_FIVE":
+	// 	if orderSheet.Price != "" {
+	// 		// Multiply by 2 to work with whole numbers
+	// 		price, err := decimal.NewFromString(orderSheet.Price)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		scaled := price.Mul(decimal.NewFromFloat(2))
+	// 		// Round to nearest integer
+	// 		rounded := scaled.Round(0)
+	// 		// Divide by 2 to get back to 0.5 precision
+	// 		orderSheet.Price = rounded.Div(decimal.NewFromFloat(2)).String()
+	// 	}
+	// default:
+	// 	return nil
+	// }
 
-// 	return nil
-// }
+	return nil
+}

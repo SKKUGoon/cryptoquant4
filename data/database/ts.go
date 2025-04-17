@@ -13,6 +13,7 @@ type TimeScale struct {
 
 type PremiumLog struct {
 	Timestamp       time.Time
+	ReceivedAt      time.Time
 	Symbol          string
 	Premium         float64
 	PremiumEnterPos float64
