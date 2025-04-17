@@ -1,11 +1,12 @@
-package engine_test
+package account_test
 
 import (
 	"context"
 	"testing"
 
-	"cryptoquant.com/m/engine"
 	"github.com/joho/godotenv"
+
+	"cryptoquant.com/m/engine/account"
 )
 
 func TestAccountSource_OnInit(t *testing.T) {
@@ -14,7 +15,7 @@ func TestAccountSource_OnInit(t *testing.T) {
 	}
 
 	// Create account source
-	as := engine.NewAccountSource(context.Background())
+	as := account.NewAccountSource(context.Background())
 
 	// Init account source
 	if err := as.OnInit(); err != nil {
@@ -28,7 +29,7 @@ func TestAccountSource_Sync(t *testing.T) {
 	}
 
 	// Create account source
-	as := engine.NewAccountSourceSync(context.Background())
+	as := account.NewAccountSourceSync(context.Background())
 
 	// Check if redis's information is inserted
 

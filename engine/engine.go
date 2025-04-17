@@ -13,6 +13,7 @@ import (
 	config "cryptoquant.com/m/config"
 	database "cryptoquant.com/m/data/database"
 	binancesource "cryptoquant.com/m/data/sources/binance"
+	account "cryptoquant.com/m/engine/account"
 	binancetrade "cryptoquant.com/m/engine/trade/binance"
 	upbittrade "cryptoquant.com/m/engine/trade/upbit"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
@@ -44,7 +45,7 @@ type EngineContext struct {
 	BinanceTrader *binancetrade.Trader
 
 	// Accounts - One true source
-	AccountSource *AccountSource
+	AccountSource *account.AccountSource
 
 	// Data
 	Database         *database.Database

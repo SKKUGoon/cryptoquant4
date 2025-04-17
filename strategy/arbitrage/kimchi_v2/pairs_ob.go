@@ -17,7 +17,7 @@ import (
 // At real time we cannot use the premium.
 // We only enter at best bid and best ask.
 // Calculated EnterPremium and ExitPremium
-type UpbitBinancePremiumBest struct {
+type UpbitBinancePair struct {
 	mu          sync.Mutex
 	KimchiAsset *AssetBest
 	AnchorAsset *AssetBest // USDTKRW
@@ -45,7 +45,7 @@ type UpbitBinancePremiumBest struct {
 // Run is a function that runs the strategy.
 // It listens to the price channels and calculates the premium.
 // Use less `case` to reduce the number of select cases. - Increase performance.
-func (p *UpbitBinancePremiumBest) Run(ctx context.Context) {
+func (p *UpbitBinancePair) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -101,7 +101,7 @@ func (p *UpbitBinancePremiumBest) Run(ctx context.Context) {
 	}
 }
 
-func (p *UpbitBinancePremiumBest) Status() (bool, string) {
+func (p *UpbitBinancePair) Status() (bool, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
@@ -113,13 +113,13 @@ func (p *UpbitBinancePremiumBest) Status() (bool, string) {
 	)
 }
 
-func (p *UpbitBinancePremiumBest) CheckEnter(enter float64) bool {
+func (p *UpbitBinancePair) CheckEnter(enter float64) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.EnterPremium < enter
 }
 
-func (p *UpbitBinancePremiumBest) CreatePremiumLongOrders(longFund, shortFund float64) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
+func (p *UpbitBinancePair) CreatePremiumLongOrders(longFund, shortFund float64) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -157,7 +157,7 @@ func (p *UpbitBinancePremiumBest) CreatePremiumLongOrders(longFund, shortFund fl
 
 // CreatePremiumShortOrders sends empty order sheets.
 // It is filled by the engine and account source.
-func (p *UpbitBinancePremiumBest) CreatePremiumShortOrders(symbol string) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
+func (p *UpbitBinancePair) CreatePremiumShortOrders(symbol string) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -166,13 +166,13 @@ func (p *UpbitBinancePremiumBest) CreatePremiumShortOrders(symbol string) (upbit
 	return upbitOrderSheet, binanceOrderSheet, nil
 }
 
-func (p *UpbitBinancePremiumBest) CheckExit(exit float64) bool {
+func (p *UpbitBinancePair) CheckExit(exit float64) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.ExitPremium > exit
 }
 
-func (p *UpbitBinancePremiumBest) ToPremiumLog() database.PremiumLog {
+func (p *UpbitBinancePair) ToPremiumLog() database.PremiumLog {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return database.PremiumLog{
@@ -188,7 +188,7 @@ func (p *UpbitBinancePremiumBest) ToPremiumLog() database.PremiumLog {
 	}
 }
 
-func (p *UpbitBinancePremiumBest) calculatePremiumEnterPos() {
+func (p *UpbitBinancePair) calculatePremiumEnterPos() {
 	if p.UpbitBestAsk == 0 || p.BinanceBestBid == 0 || p.AnchorPrice == 0 {
 		return
 	}
@@ -199,7 +199,7 @@ func (p *UpbitBinancePremiumBest) calculatePremiumEnterPos() {
 	p.EnterPremium = premium
 }
 
-func (p *UpbitBinancePremiumBest) calculatePremiumExitPos() {
+func (p *UpbitBinancePair) calculatePremiumExitPos() {
 	if p.UpbitBestBid == 0 || p.BinanceBestAsk == 0 || p.AnchorPrice == 0 {
 		return
 	}
