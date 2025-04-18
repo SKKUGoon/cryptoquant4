@@ -1,6 +1,54 @@
+# Version control
 .git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+
+# Tests and examples
+test/
+tests/
+examples/
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs and databases
 *.log
 *.sqlite
+*.sqlite3
+/log/*
+/data/*
+
+# Environment and configuration
 .env
+.env.*
+!.env.example
+
+# Binaries and build artifacts
 bin/
-log/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDE and OS specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
