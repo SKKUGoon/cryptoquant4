@@ -3,12 +3,9 @@ package engine
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
-	"time"
 
 	config "cryptoquant.com/m/config"
 	database "cryptoquant.com/m/data/database"
@@ -85,31 +82,12 @@ type EngineContext struct {
 
 	// Trading Channel
 	inPosition       bool
+	premiumChan      chan [2]float64 // [EnterPremium, ExitPremium]
 	upbitOrderChan   chan upbitrest.OrderSheet
 	binanceOrderChan chan binancerest.OrderSheet
 
 	// logger
-	logger *log.Logger
-	tsLog  chan database.PremiumLog
-}
-
-func setupLog() *log.Logger {
-	// Ensure the log directory exists
-	if err := os.MkdirAll("log", 0755); err != nil {
-		panic(err)
-	}
-
-	// Create a log file with today's date in the name
-	today := time.Now().Format("20060102")
-	logPath := filepath.Join("log", "engine_"+today+".log")
-	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		panic(err)
-	}
-
-	// Create a logger that writes to the file and stdout
-	multiWriter := io.MultiWriter(logFile, os.Stdout)
-	return log.New(multiWriter, "", log.LstdFlags)
+	tsLog chan database.PremiumLog
 }
 
 func New(ctx context.Context) *EngineContext {
@@ -123,45 +101,42 @@ func New(ctx context.Context) *EngineContext {
 	// Controls the lifecycle of the whole engine and daemon structs and streams
 	engineCtx, cancel := context.WithCancel(ctx)
 
-	// 3. Set up logging
-	logger := setupLog()
-
-	// 4. Connect to database
+	// 3. Connect to database
 	db, err := database.ConnectDB()
 	if err != nil {
-		logger.Printf("Failed to connect to database: %v", err)
+		log.Printf("Failed to connect to database: %v", err)
 		panic(err)
 	}
 	ts, err := database.ConnectTS()
 	if err != nil {
-		logger.Printf("Failed to connect to TimeScale: %v", err)
+		log.Printf("Failed to connect to TimeScale: %v", err)
 		panic(err)
 	}
 
-	// 5. Create exchange configs
+	// 4. Create exchange configs
 	kimchiConfig, err := config.NewUpbitSpotTradeConfig()
 	if err != nil {
-		logger.Printf("Failed to create Upbit config: %v", err)
+		log.Printf("Failed to create Upbit config: %v", err)
 		panic(err)
 	}
 	binanceConfig, err := config.NewBinanceFutureTradeConfig()
 	if err != nil {
-		logger.Printf("Failed to create Binance config: %v", err)
+		log.Printf("Failed to create Binance config: %v", err)
 		panic(err)
 	}
 
-	// 6. Confirm anchor symbol
+	// 5. Confirm anchor symbol
 	anchor := os.Getenv("ANCHOR_SYMBOL")
 	if anchor == "" {
-		logger.Printf("Failed to confirm anchor symbol: %v", "Environment variables not set")
+		log.Println("Failed to confirm anchor symbol: Environment variables not set")
 		panic("Environment variables not set")
 	}
 
-	// 7. Create traders
+	// 6. Create traders
 	kimchiTrader := upbittrade.NewTrader()
 	binanceTrader := binancetrade.NewTrader()
 
-	// 8. Create struct with order channels
+	// 7. Create struct with order channels
 	engine := &EngineContext{
 		EngineName:            engineName,
 		ctx:                   engineCtx,
@@ -172,7 +147,6 @@ func New(ctx context.Context) *EngineContext {
 		BinanceTrader:         binanceTrader,
 		Database:              db,
 		TimeScale:             ts,
-		logger:                logger,
 		AnchorAssetSymbol:     anchor,
 
 		upbitTradeChan:   make(chan float64),
@@ -196,14 +170,14 @@ func New(ctx context.Context) *EngineContext {
 		anchorBestBidQtyChan:  make(chan float64),
 
 		inPosition:       false,
+		premiumChan:      make(chan [2]float64),
 		upbitOrderChan:   make(chan upbitrest.OrderSheet),
 		binanceOrderChan: make(chan binancerest.OrderSheet),
 
 		tsLog: make(chan database.PremiumLog),
 	}
 
-	logger.Printf("Engine initialized")
-
+	log.Println("Engine initialized")
 	return engine
 }
 
@@ -219,24 +193,24 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 	ksymbol := os.Getenv("UPBIT_SYMBOL")
 
 	if csymbol == "" || ksymbol == "" {
-		e.logger.Printf("Failed to confirm target symbols: %v", "Environment variables not set")
+		log.Println("Failed to confirm target symbols: Environment variables not set")
 		panic("Environment variables not set")
 	}
 
 	// Confirm trading symbols in cefi and kimchi
 	if !e.BinanceExchangeConfig.IsAvailableSymbol(csymbol) {
-		e.logger.Printf("Failed to confirm target symbols: %v", "Binance symbol not available")
+		log.Println("Failed to confirm target symbols: Binance symbol not available")
 		panic("Binance symbol not available")
 	}
 
 	if !e.UpbitExchangeConfig.IsAvailableSymbol(ksymbol) {
-		e.logger.Printf("Failed to confirm target symbols: %v", "Kimchi symbol not available")
+		log.Println("Failed to confirm target symbols: Kimchi symbol not available")
 		panic("Kimchi symbol not available")
 	}
 
 	// Confirm anchor symbol
 	if !e.UpbitExchangeConfig.IsAvailableSymbol(e.AnchorAssetSymbol) {
-		e.logger.Printf("Failed to confirm target symbols: %v", "Kimchi anchor symbol not available")
+		log.Println("Failed to confirm target symbols: Kimchi anchor symbol not available")
 		panic("Kimchi anchor symbol not available")
 	}
 
@@ -250,7 +224,7 @@ func (e *EngineContext) ConfirmTargetSymbols() {
 // 2. ExitPremiumBoundary: 1.0035
 // These parameters are used to determine the entry and exit points for the arbitrage strategy.
 func (e *EngineContext) ConfirmTradeParameters() {
-	e.logger.Printf("Confirming trade parameters")
+	log.Println("Confirming trade parameters")
 
 	// Premium Calculation Parameters key value
 	enterPremiumBoundaryKey := fmt.Sprintf("%v_enter_premium_boundary", e.EngineName)
@@ -261,7 +235,7 @@ func (e *EngineContext) ConfirmTradeParameters() {
 	// EnterPremiumBoundary: 0.9980
 	enterPremiumBoundary, err := e.Database.GetTradeMetadata(enterPremiumBoundaryKey, 0.9980)
 	if err != nil {
-		e.logger.Printf("Failed to get enter premium boundary: %v", err)
+		log.Printf("Failed to get enter premium boundary: %v", err)
 		panic(err)
 	}
 	e.EnterPremiumBoundary = enterPremiumBoundary.(float64)
@@ -269,12 +243,12 @@ func (e *EngineContext) ConfirmTradeParameters() {
 	// ExitPremiumBoundary: 1.0035
 	exitPremiumBoundary, err := e.Database.GetTradeMetadata(exitPremiumBoundaryKey, 1.0035)
 	if err != nil {
-		e.logger.Printf("Failed to get exit premium boundary: %v", err)
+		log.Printf("Failed to get exit premium boundary: %v", err)
 		panic(err)
 	}
 	e.ExitPremiumBoundary = exitPremiumBoundary.(float64)
 
-	e.logger.Printf("Trade parameters confirmed: enterPremiumBoundary: %v, exitPremiumBoundary: %v", e.EnterPremiumBoundary, e.ExitPremiumBoundary)
+	log.Printf("Trade parameters confirmed: enterPremiumBoundary: %v, exitPremiumBoundary: %v", e.EnterPremiumBoundary, e.ExitPremiumBoundary)
 }
 
 // StartAssetPair initializes the asset objects for the trading pairs and sets up their channels.
@@ -283,7 +257,7 @@ func (e *EngineContext) ConfirmTradeParameters() {
 // 2. ForexAsset: Represents the Cefi trading pair
 // 3. AnchorAsset: Represents the anchor trading pair
 func (e *EngineContext) StartAssetPair() {
-	e.logger.Printf("Starting asset for %v", e.UpbitAssetSymbol)
+	log.Printf("Starting asset for %v", e.UpbitAssetSymbol)
 	kimchiAsset := kimchiarbv1.NewAsset(e.UpbitAssetSymbol)
 	forexAsset := kimchiarbv1.NewAsset(e.BinanceAssetSymbol)
 	anchorAsset := kimchiarbv1.NewAsset(e.AnchorAssetSymbol)
@@ -312,9 +286,10 @@ func (e *EngineContext) StartAssetPair() {
 		AnchorAsset: anchorAsset,
 		CefiAsset:   forexAsset,
 		KimchiAsset: kimchiAsset,
+		PremiumChan: e.premiumChan,
 	}
 
-	e.logger.Printf("Asset Pairs(%v, %v, %v) initialized", e.UpbitAssetSymbol, e.BinanceAssetSymbol, e.AnchorAssetSymbol)
+	log.Printf("Asset Pairs(%v, %v, %v) initialized", e.UpbitAssetSymbol, e.BinanceAssetSymbol, e.AnchorAssetSymbol)
 }
 
 // StartAssetStreams starts the streams for the asset pairs.
@@ -323,10 +298,10 @@ func (e *EngineContext) StartAssetPair() {
 // 2. CefiStream: Represents the Cefi trading pair (Binance, 2 streams: price and book)
 // 3. AnchorStream: Represents the anchor trading pair (Upbit, 1 stream: price)
 func (e *EngineContext) StartAssetStreams() {
-	e.logger.Printf("Engine started")
+	log.Println("Engine started")
 
 	// Start stream - Kimchi - Upbit
-	e.logger.Printf("Starting stream for %v", e.UpbitAssetSymbol)
+	log.Printf("Starting stream for %v", e.UpbitAssetSymbol)
 	kimchi1 := upbitmarket.NewPriceHandler(e.upbitTradeChan)
 	kimchi2 := upbitmarket.NewBestBidPrcHandler(e.upbitBestBidPrcChan)
 	kimchi3 := upbitmarket.NewBestBidQtyHandler(e.upbitBestBidQtyChan)
@@ -338,7 +313,7 @@ func (e *EngineContext) StartAssetStreams() {
 	go upbitmarket.SubscribeBook(e.ctx, e.UpbitAssetSymbol, kimchiHandlerBook)
 
 	// Start stream - Binance
-	e.logger.Printf("Starting stream for %v", e.BinanceAssetSymbol)
+	log.Printf("Starting stream for %v", e.BinanceAssetSymbol)
 	cefi1 := binancemarket.NewPriceHandler(e.binanceTradeChan)
 	cefi2 := binancemarket.NewBestBidPrcHandler(e.binanceBestBidPrcChan)
 	cefi3 := binancemarket.NewBestBidQtyHandler(e.binanceBestBidQtyChan)
@@ -350,109 +325,79 @@ func (e *EngineContext) StartAssetStreams() {
 	go binancemarket.SubscribeBook(e.ctx, e.BinanceAssetSymbol, cefiHandlerBook)
 
 	// Start stream - Anchor - Upbit
-	e.logger.Printf("Starting stream for %v", e.AnchorAssetSymbol)
+	log.Printf("Starting stream for %v", e.AnchorAssetSymbol)
 	anchor1 := upbitmarket.NewPriceHandler(e.anchorTradeChan)
 	h3s := []func(upbitws.SpotTrade) error{anchor1}
 	go upbitmarket.SubscribeTrade(e.ctx, e.AnchorAssetSymbol, h3s)
 }
 
-// StartStrategy starts the arbitrage strategy.
+// Run starts the arbitrage strategy.
 // It creates a goroutine that runs the arbitrage strategy and tracks consecutive failures.
 // If the strategy is not ready, it logs an error and panics. Otherwise, it logs a message and starts the strategy.
-func (e *EngineContext) StartStrategy() {
-	e.logger.Printf("Starting strategy")
+func (e *EngineContext) Run() {
+	log.Println("Starting strategy")
 	go e.UpbitBinancePairs.Run(e.ctx)
 
-	// Track consecutive failures
-	consecutiveFailures := 0
-	const maxConsecutiveFailures = 5000 // Adjust this threshold as needed
-
 	go func() {
-		var entryUpbitOrderSheet upbitrest.OrderSheet // Long
-		// var exitUpbitOrderSheet upbitrest.OrderSheet      // Exit position
+		var entryUpbitOrderSheet upbitrest.OrderSheet     // Long
+		var exitUpbitOrderSheet upbitrest.OrderSheet      // Exit position
 		var entryBinanceOrderSheet binancerest.OrderSheet // Short
-		// var exitBinanceOrderSheet binancerest.OrderSheet  // Exit position
+		var exitBinanceOrderSheet binancerest.OrderSheet  // Exit position
 		var err error
 
 		for {
 			select {
 			case <-e.ctx.Done():
 				return
-			case <-time.Tick(100 * time.Millisecond):
-				ok, msg := e.UpbitBinancePairs.Status()
-				if !ok {
-					consecutiveFailures++
-					e.logger.Printf("Strategy is not ready: %v (consecutive failures: %d)", msg, consecutiveFailures)
+			case premiums := <-e.premiumChan:
+				enter := premiums[0]
+				exit := premiums[1]
 
-					if consecutiveFailures >= maxConsecutiveFailures {
-						e.logger.Printf("Too many consecutive failures (%d), initiating container restart", consecutiveFailures)
-						// Trigger graceful shutdown
-						e.Stop()
-						// Exit with non-zero status to trigger container restart
-						os.Exit(1)
-					}
-					continue
-				} else {
-					// Reset failure counter on success
-					consecutiveFailures = 0
-					e.logger.Println(msg)
-				}
-
-				// Check the premium boundary
-				if e.inPosition && e.UpbitBinancePairs.CheckExit(e.ExitPremiumBoundary) {
-					e.logger.Printf("Exiting position")
-					// e.orderChan <- "exit"
-					// TODO: Implement this
-					e.AccountSource.Update()
-					e.logger.Printf("Account updated")
-				} else if !e.inPosition && e.UpbitBinancePairs.CheckEnter(e.EnterPremiumBoundary) {
-					e.logger.Printf("Entering position")
+				switch true {
+				case e.inPosition && exit > e.ExitPremiumBoundary:
+					log.Printf("Exiting position: %v (standard: %v)", exit, e.ExitPremiumBoundary)
 
 					// Create order sheets
-					entryUpbitOrderSheet, entryBinanceOrderSheet, err = e.UpbitBinancePairs.CreatePremiumLongOrders(
+					if exitUpbitOrderSheet, exitBinanceOrderSheet, err = e.UpbitBinancePairs.CreatePremiumShortOrders(
+						e.UpbitAssetSymbol,
+					); err != nil {
+						log.Printf("Failed to create premium short orders: %v", err)
+						continue
+					}
+
+					// TODO: Make short orders (Exit)
+					log.Printf("Exit order sheets: %+v, %+v", exitUpbitOrderSheet, exitBinanceOrderSheet)
+
+					e.AccountSource.Update()
+				case !e.inPosition && enter < e.EnterPremiumBoundary:
+					log.Printf("Entering position: %v (standard: %v)", enter, e.EnterPremiumBoundary)
+
+					// Create order sheets
+					if entryUpbitOrderSheet, entryBinanceOrderSheet, err = e.UpbitBinancePairs.CreatePremiumLongOrders(
 						e.AccountSource.UpbitFund.AvailableFund,
 						e.AccountSource.BinanceFund.AvailableFund,
-					)
-					if err != nil {
-						e.logger.Printf("Failed to create premium long orders: %v", err)
+					); err != nil {
+						log.Printf("Failed to create premium long orders: %v", err)
 						continue
 					}
 
 					// Audit order sheet precision
 					err = e.UpbitExchangeConfig.AuditOrderSheetPrecision(&entryUpbitOrderSheet)
 					if err != nil {
-						e.logger.Printf("Failed to audit order sheet precision: %v", err)
+						log.Printf("Failed to audit order sheet precision: %v", err)
 						continue
 					}
 					err = e.BinanceExchangeConfig.AuditOrderSheetPrecision(&entryBinanceOrderSheet)
 					if err != nil {
-						e.logger.Printf("Failed to audit order sheet precision: %v", err)
+						log.Printf("Failed to audit order sheet precision: %v", err)
 						continue
 					}
 
-					fmt.Printf("%+v\n", entryUpbitOrderSheet)
-					fmt.Printf("%+v\n", entryBinanceOrderSheet)
+					// TODO: Send order sheet
 
-					// Send order sheets
-					// upbitResult, err := e.KimchiTrader.SendOrder(upbitOrderSheet)
-					// if err != nil {
-					// 	e.logger.Printf("Failed to send upbit order: %v", err)
-					// 	continue
-					// }
-					// binanceResult, err := e.BinanceTrader.SendOrder(binanceOrderSheet)
-					// if err != nil {
-					// 	e.logger.Printf("Failed to send binance order: %v", err)
-					// 	continue
-					// }
-
-					// Update account source
 					e.AccountSource.Update()
 					e.EnterExitPosition()
-					e.logger.Printf("Account updated")
 				}
-
-				log := e.UpbitBinancePairs.ToPremiumLog()
-				e.tsLog <- log
 			}
 		}
 	}()
@@ -461,7 +406,7 @@ func (e *EngineContext) StartStrategy() {
 // StartTSLog starts the TimeScale log.
 // It creates a goroutine that logs the premium data to the TimeScale database.
 func (e *EngineContext) StartTSLog() {
-	e.logger.Printf("Starting DB log")
+	log.Println("Starting DB log")
 	buffer := make([]database.PremiumLog, 0, 100) // Insert 100 at a time
 	go func() {
 		for {
@@ -475,9 +420,9 @@ func (e *EngineContext) StartTSLog() {
 					copy(bufferCopy, buffer) // Copy the buffer to avoid race condition
 					go func(logs []database.PremiumLog) {
 						if err := e.TimeScale.InsertPremiumLog(logs); err != nil {
-							e.logger.Printf("Failed to insert premium log: %v", err)
+							log.Printf("Failed to insert premium log: %v", err)
 						} else {
-							e.logger.Printf("Inserted %v rows to TimeScale", len(logs))
+							log.Printf("Inserted %v rows to TimeScale", len(logs))
 						}
 					}(bufferCopy)
 					buffer = make([]database.PremiumLog, 0, 100)
@@ -488,10 +433,10 @@ func (e *EngineContext) StartTSLog() {
 }
 
 func (e *EngineContext) Stop() {
-	e.logger.Printf("Engine stopping...")
+	log.Println("Engine stopping...")
 	e.cancel()
 	e.wg.Wait()
-	e.logger.Printf("Engine stopped")
+	log.Println("Engine stopped")
 }
 
 func (e *EngineContext) Context() context.Context {

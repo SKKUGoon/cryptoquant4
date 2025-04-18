@@ -47,7 +47,7 @@ func main() {
 	// Start all components with development logging
 	engine.StartAssetPair()
 	engine.StartAssetStreams()
-	engine.StartStrategy()
+	engine.Run()
 	engine.StartTSLog()
 
 	// Wait for interrupt signal

@@ -36,6 +36,8 @@ type UpbitBinancePair struct {
 	KimchiBestBidQty float64 // Calculate how much market can take
 	KimchiBestAsk    float64
 	KimchiBestAskQty float64 // Calculate how much market can take
+
+	PremiumChan chan [2]float64 // [EnterPremium, ExitPremium]
 }
 
 func (p *UpbitBinancePair) Run(ctx context.Context) {
@@ -49,6 +51,8 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			p.calculatePremium()
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
+
+			p.PremiumChan <- [2]float64{p.EnterPremium, p.ExitPremium}
 			p.mu.Unlock()
 		// Cefi
 		case cefiPrice := <-p.CefiAsset.priceChan:
@@ -102,6 +106,7 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			p.KimchiBestAskQty = kimchiBestAskQty
 			p.mu.Unlock()
 		}
+		p.PremiumChan <- [2]float64{p.EnterPremium, p.ExitPremium}
 	}
 }
 

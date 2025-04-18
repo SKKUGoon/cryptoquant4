@@ -33,12 +33,6 @@ COPY --from=builder /app/cryptoquant-server /app/
 # Add this line to set correct owner
 RUN chown appuser:appuser /app/cryptoquant-server
 
-
-# Create a non-root user and set up permissions
-RUN mkdir -p /app/log && \
-    chown -R appuser:appuser /app/log && \
-    chmod 755 /app/log
-
 USER appuser
 
 # Expose port if needed
