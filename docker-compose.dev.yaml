@@ -11,8 +11,6 @@ services:
       start_period: 30s
     ports:
       - 6379:6379
-    volumes:
-      - redis_data:/data
     networks:
       - crypto-dev
 
@@ -60,6 +58,9 @@ services:
       - TS_HOST=${TS_HOST}
       - TS_PORT=${TS_PORT}
       - TS_NAME=${TS_NAME:-cryptoquant_ts}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - BINANCE_SYMBOL=XRPUSDT
       - UPBIT_SYMBOL=KRW-XRP
       - ANCHOR_SYMBOL=KRW-USDT
@@ -108,8 +109,62 @@ services:
       - TS_HOST=${TS_HOST}
       - TS_PORT=${TS_PORT}
       - TS_NAME=${TS_NAME:-cryptoquant_ts}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
+      - ANCHOR_SYMBOL=KRW-USDT
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY}
+      - UPBIT_API_KEY=${UPBIT_API_KEY}
+    networks:
+      - crypto-dev
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  eth:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        - BUILD_TAGS=server
+    container_name: cryptoquant_eth_dev
+    depends_on:
+      redis:
+        condition: service_healthy
+      cryptoquant_init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    labels:
+      engine: eth
+      type: trader
+    env_file:
+      - .env
+    environment:
+      - ENGINE_NAME=eth
+      - USERNAME=${USERNAME:-postgres}
+      - PASSWORD=${PASSWORD:-postgres}
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_NAME=${PG_NAME:-cryptoquant}
+      - TS_HOST=${TS_HOST}
+      - TS_PORT=${TS_PORT}
+      - TS_NAME=${TS_NAME:-cryptoquant_ts}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - BINANCE_SYMBOL=ETHUSDT
+      - UPBIT_SYMBOL=KRW-ETH
       - ANCHOR_SYMBOL=KRW-USDT
       - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
       - BINANCE_API_KEY=${BINANCE_API_KEY}

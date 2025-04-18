@@ -7,7 +7,7 @@ import (
 	"context"
 	"log"
 
-	"cryptoquant.com/m/engine"
+	account "cryptoquant.com/m/engine/account"
 )
 
 // Synchronize the redis database with the api information.
@@ -15,7 +15,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	as := engine.NewAccountSource(ctx)
+	as := account.NewAccountSource(ctx)
 	if err := as.OnInit(); err != nil {
 		log.Fatalf("failed to init account source: %v", err)
 	}

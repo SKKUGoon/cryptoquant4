@@ -136,7 +136,10 @@ func New(ctx context.Context) *EngineContext {
 	kimchiTrader := upbittrade.NewTrader()
 	binanceTrader := binancetrade.NewTrader()
 
-	// 7. Create struct with order channels
+	// 7. Create account source
+	accountSource := account.NewAccountSource(engineCtx)
+
+	// 8. Create struct with order channels
 	engine := &EngineContext{
 		EngineName:            engineName,
 		ctx:                   engineCtx,
@@ -145,6 +148,7 @@ func New(ctx context.Context) *EngineContext {
 		BinanceExchangeConfig: binanceConfig,
 		UpbitTrader:           kimchiTrader,
 		BinanceTrader:         binanceTrader,
+		AccountSource:         accountSource,
 		Database:              db,
 		TimeScale:             ts,
 		AnchorAssetSymbol:     anchor,
@@ -398,6 +402,7 @@ func (e *EngineContext) Run() {
 					e.AccountSource.Update()
 					e.EnterExitPosition()
 				}
+				log.Printf("Premium: %v, %v", enter, exit)
 			}
 		}
 	}()

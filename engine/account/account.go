@@ -60,9 +60,13 @@ type Fund struct {
 }
 
 func NewAccountSource(ctx context.Context) *AccountSource {
+	redisAddr := os.Getenv("REDIS_HOST")
+	redisPort := os.Getenv("REDIS_PORT")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "",
+		Addr:     fmt.Sprintf("%s:%s", redisAddr, redisPort),
+		Password: redisPassword,
 		DB:       0,
 	})
 	// Check Redis connectivity

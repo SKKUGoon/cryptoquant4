@@ -25,7 +25,7 @@ func main() {
 	// Start all necessary components
 	engine.StartAssetPair()
 	engine.StartAssetStreams()
-	engine.StartStrategy()
+	engine.Run()
 	engine.StartTSLog()
 
 	// Wait for interrupt signal

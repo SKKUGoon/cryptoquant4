@@ -51,8 +51,6 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			p.calculatePremium()
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
-
-			p.PremiumChan <- [2]float64{p.EnterPremium, p.ExitPremium}
 			p.mu.Unlock()
 		// Cefi
 		case cefiPrice := <-p.CefiAsset.priceChan:
@@ -106,6 +104,11 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			p.KimchiBestAskQty = kimchiBestAskQty
 			p.mu.Unlock()
 		}
+
+		if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
+			continue
+		}
+
 		p.PremiumChan <- [2]float64{p.EnterPremium, p.ExitPremium}
 	}
 }
