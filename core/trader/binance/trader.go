@@ -66,7 +66,3 @@ func (t *Trader) checkRateLimit(weight int) {
 		t.currentRate = 0 // Reset rate limit counter for new minute
 	}
 }
-
-func (t *Trader) Run() {
-
-}
