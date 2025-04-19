@@ -15,6 +15,7 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// Sync account information into Redis
 	as := account.NewAccountSource(ctx)
 	if err := as.OnInit(); err != nil {
 		log.Fatalf("failed to init account source: %v", err)
