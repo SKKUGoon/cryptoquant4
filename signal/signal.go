@@ -120,7 +120,7 @@ func New(ctx context.Context) *SignalContext {
 		log.Println("Failed to confirm trader address: Environment variables not set")
 		panic("Environment variables not set")
 	}
-	traderMessenger := NewTraderMessenger(traderAddr)
+	traderMessenger := NewTraderMessenger(traderAddr, ctx)
 
 	// 7. Create struct with order channels
 	engine := &SignalContext{

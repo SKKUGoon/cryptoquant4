@@ -14,14 +14,17 @@ type TraderMessenger struct {
 	ctx    context.Context
 }
 
-func NewTraderMessenger(addr string) *TraderMessenger {
+func NewTraderMessenger(addr string, ctx context.Context) *TraderMessenger {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
 
 	client := traderpb.NewTraderClient(conn)
-	return &TraderMessenger{client: client}
+	return &TraderMessenger{
+		client: client,
+		ctx:    ctx,
+	}
 }
 
 func (t *TraderMessenger) SubmitTrade(trade *traderpb.TradeRequest) (*traderpb.OrderResponse, error) {

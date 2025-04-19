@@ -105,7 +105,10 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			p.mu.Unlock()
 		}
 
-		if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
+		// Check for correct data input
+		if p.KimchiPrice == 0 || p.KimchiBestBid == 0 || p.KimchiBestAsk == 0 ||
+			p.CefiPrice == 0 || p.CefiBestBid == 0 || p.CefiBestAsk == 0 ||
+			p.AnchorPrice == 0 {
 			continue
 		}
 

@@ -6,17 +6,20 @@ WORKDIR /app
 # Install git and build dependencies
 RUN apk add --no-cache git
 
-# Copy go mod and sum files
+# Copy go mod and sum files first
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy the entire module structure
 COPY . .
 
+# Enable Go modules
+ENV GO111MODULE=on
+
 # Build the application with specified tags
-ARG BUILD_TAGS=server
+ARG BUILD_TAGS
 RUN CGO_ENABLED=0 GOOS=linux go build -tags ${BUILD_TAGS} -o /app/cryptoquant-server .
 
 # Final stage

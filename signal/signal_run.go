@@ -132,6 +132,7 @@ func (e *SignalContext) Run() {
 			if err != nil {
 				log.Printf("Failed to submit test trade: %v", err)
 			}
+			log.Println("Test trade submitted")
 			return // Exit goroutine after single execution
 		}
 	}()
@@ -203,7 +204,7 @@ func (e *SignalContext) Run() {
 						e.ChangePositionStatus()
 					}
 				}
-				log.Printf("Premium: %v, %v", enter, exit)
+				// log.Printf("Premium: %v (enter. %v), %v (exit. %v)", enter, e.EnterPremiumBoundary, exit, e.ExitPremiumBoundary)
 			}
 		}
 	}()

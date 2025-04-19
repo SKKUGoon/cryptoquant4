@@ -2,9 +2,15 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	pb "cryptoquant.com/m/gen/traderpb"
+	binancerest "cryptoquant.com/m/internal/binance/rest"
+	upbitrest "cryptoquant.com/m/internal/upbit/rest"
+	"github.com/shopspring/decimal"
 )
 
 // Trader gRPC server
@@ -15,7 +21,21 @@ type Server struct {
 func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
 	switch order := req.OrderType.(type) {
 	case *pb.TradeRequest_PairOrder:
-		log.Printf("Pair order: %v", order)
+		// Generate upbit order sheet
+		upbitOrderSheet, err := generateUpbitOrderSheet(order.PairOrder.UpbitOrder)
+		if err != nil {
+			return nil, err
+		}
+
+		// Generate binance order sheet
+		binanceOrderSheet, err := generateBinanceOrderSheet(order.PairOrder.BinanceOrder)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Printf("Pair order: %v", upbitOrderSheet)
+		log.Printf("Binance order: %v", binanceOrderSheet)
+
 	case *pb.TradeRequest_SingleOrder:
 		// TODO: Implement single order
 		return &pb.OrderResponse{Success: false, Message: "Not implemented"}, nil
@@ -24,4 +44,46 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 	}
 
 	return &pb.OrderResponse{Success: true, Message: "Order submitted"}, nil
+}
+
+func generateUpbitOrderSheet(order *pb.ExchangeOrder) (*upbitrest.OrderSheet, error) {
+	switch order.Side {
+	case "buy":
+		return &upbitrest.OrderSheet{
+			Symbol:  order.Symbol,
+			Side:    "bid",
+			Price:   strconv.FormatFloat(order.Amount, 'f', -1, 64),
+			OrdType: "market",
+		}, nil
+
+	case "sell":
+		return &upbitrest.OrderSheet{
+			Symbol:  order.Symbol,
+			Side:    "ask",
+			Volume:  strconv.FormatFloat(order.Amount, 'f', -1, 64),
+			OrdType: "market",
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid order side: %v", order.Side)
+	}
+}
+
+func generateBinanceOrderSheet(order *pb.ExchangeOrder) (*binancerest.OrderSheet, error) {
+	switch order.Side {
+	case "buy":
+		// To binance, buy order is exit order
+		return &binancerest.OrderSheet{}, nil
+	case "sell":
+		timestamp := time.Now().UnixMilli()
+		quantity := decimal.NewFromFloat(order.Amount)
+		return &binancerest.OrderSheet{
+			Symbol:    order.Symbol,
+			Side:      "SELL",
+			Quantity:  quantity,
+			Type:      "MARKET",
+			Timestamp: timestamp,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid order side: %v", order.Side)
+	}
 }
