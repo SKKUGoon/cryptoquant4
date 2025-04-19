@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package trader;
+
+option go_package = "cryptoquant.com/m/gen/traderpb";
+
+// --- ENUM for clarity ---
+enum AmountKey {
+  AMOUNT_UNSPECIFIED = 0;
+  QUANTITY = 1;         // raw coin quantity
+  TOTAL_VALUE = 2;      // e.g., 1,000,000 KRW or 800 USDT
+}
+
+// --- Generalized exchange order ---
+message ExchangeOrder {
+  string exchange = 1;        // "upbit", "binance", etc.
+  string symbol = 2;          // e.g., "BTCUSDT" for binance, "BTC-KRW" for upbit
+  string side = 3;            // "buy" or "sell"
+  double amount = 4;
+  AmountKey amount_key = 5;   // Describes what `amount` means
+}
+
+// --- Order types ---
+
+message SingleOrderSheet {
+  string symbol = 1;
+  ExchangeOrder order = 2;
+  string reason = 3;
+}
+
+message PairOrderSheet {
+  string base_symbol = 1;
+  string quote_symbol = 2;
+  ExchangeOrder upbit_order = 3;
+  ExchangeOrder binance_order = 4;
+  string reason = 5;
+}
+
+// --- Polymorphic Request ---
+
+message TradeRequest {
+  oneof order_type {
+    SingleOrderSheet single_order = 1;
+    PairOrderSheet pair_order = 2;
+    // Future: MultiLegOrderSheet multi_leg_order = 3;
+  }
+}
+
+// --- Response ---
+
+message OrderResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// --- Service Interface ---
+
+service Trader {
+  rpc SubmitTrade(TradeRequest) returns (OrderResponse);
+}

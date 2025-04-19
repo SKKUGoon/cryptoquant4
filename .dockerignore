@@ -22,7 +22,6 @@ docker-compose*.yml
 *.sqlite
 *.sqlite3
 /log/*
-/data/*
 
 # Environment and configuration
 .env

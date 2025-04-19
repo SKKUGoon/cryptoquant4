@@ -1,5 +1,5 @@
-//go:build init
-// +build init
+//go:build init && !trader && !server
+// +build init,!trader,!server
 
 package main
 
@@ -7,7 +7,7 @@ import (
 	"context"
 	"log"
 
-	account "cryptoquant.com/m/engine/account"
+	account "cryptoquant.com/m/core/account"
 )
 
 // Synchronize the redis database with the api information.

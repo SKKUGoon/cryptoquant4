@@ -1,5 +1,5 @@
-//go:build !server && !init
-// +build !server,!init
+//go:build !server && !init && !trader
+// +build !server,!init,!trader
 
 package main
 
@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"cryptoquant.com/m/engine"
+	sig "cryptoquant.com/m/signal"
 	"github.com/joho/godotenv"
 )
 
@@ -40,7 +40,7 @@ func main() {
 	defer cancel()
 
 	// Initialize engine with development settings
-	engine := engine.New(ctx)
+	engine := sig.New(ctx)
 	engine.ConfirmTargetSymbols()
 	engine.ConfirmTradeParameters()
 

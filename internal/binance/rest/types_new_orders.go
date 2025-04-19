@@ -69,6 +69,24 @@ func NewTestOrderSheetLong() *OrderSheet {
 	return test
 }
 
+func NewTestOrderSheetMarketShort() *OrderSheet {
+	// Market order only needs quantity
+	quantity, err := decimal.NewFromString("0.002")
+	if err != nil {
+		log.Fatalf("Failed to create quantity: %v", err)
+	}
+	timestamp := time.Now().UnixMilli()
+
+	test := &OrderSheet{
+		Symbol:    "BTCUSDT",
+		Side:      "SELL",
+		Type:      "MARKET",
+		Quantity:  quantity,
+		Timestamp: timestamp,
+	}
+	return test
+}
+
 func NewTestOrderSheetShort() *OrderSheet {
 	quantity, err := decimal.NewFromString("0.05")
 	if err != nil {

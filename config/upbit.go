@@ -4,7 +4,7 @@ import (
 	"log"
 	"strings"
 
-	"cryptoquant.com/m/data/database"
+	database "cryptoquant.com/m/data/database"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
 	"github.com/shopspring/decimal"
 )
