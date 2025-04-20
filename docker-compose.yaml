@@ -1,6 +1,33 @@
+x-base-engine: &base-engine
+  # Base engine for all trading engines
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      - BUILD_TAGS=server
+  depends_on:
+    redis:
+      condition: service_healthy
+    cryptoquant_init:
+      condition: service_completed_successfully
+  restart: unless-stopped
+  networks:
+    - crypto-bridge
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 512M
+
 services:
   redis:
     image: redis:latest
+    container_name: redis
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -10,6 +37,8 @@ services:
       start_period: 30s
     ports:
       - 6379:6379
+    networks:
+      - crypto-bridge
 
   cryptoquant_init:
     build:
@@ -24,18 +53,38 @@ services:
     restart: "no"
     env_file:
       - .env
+    networks:
+      - crypto-bridge
 
-  xrp:
+  trader:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        - BUILD_TAGS=server
-    container_name: cryptoquant_xrp
+        - BUILD_TAGS=trader
+    container_name: trader
     depends_on:
       redis:
         condition: service_healthy
+      cryptoquant_init:
+        condition: service_completed_successfully
     restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - crypto-bridge
+    volumes:
+      - ./log/trader:/app/log
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Trading engines by each coin
+  xrp:
+    <<: *base-engine
+    container_name: cryptoquant_xrp
     labels:
       engine: xrp
       type: trader
@@ -43,48 +92,33 @@ services:
       - .env
     environment:
       - ENGINE_NAME=xrp
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - BINANCE_SYMBOL=XRPUSDT
       - UPBIT_SYMBOL=KRW-XRP
       - ANCHOR_SYMBOL=KRW-USDT
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - TRADER_ADDRESS=trader:50051
     volumes:
       - ./log/xrp:/app/log
-    networks:
-      - shared
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
+
+  move:
+    <<: *base-engine
+    container_name: cryptoquant_move
+    labels:
+      engine: move
+      type: trader
+    env_file:
+      - .env
+    environment:
+      - ENGINE_NAME=move
+      - BINANCE_SYMBOL=MOVEUSDT
+      - UPBIT_SYMBOL=KRW-MOVE
+      - ANCHOR_SYMBOL=KRW-USDT
+      - TRADER_ADDRESS=trader:50051
+    volumes:
+      - ./log/cow:/app/log
 
   cow:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - BUILD_TAGS=server
+    <<: *base-engine
     container_name: cryptoquant_cow
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
     labels:
       engine: cow
       type: trader
@@ -92,38 +126,14 @@ services:
       - .env
     environment:
       - ENGINE_NAME=cow
-      - USERNAME=${USERNAME}
-      - PASSWORD=${PASSWORD}
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
-      - PG_NAME=${PG_NAME}
-      - TS_HOST=${TS_HOST}
-      - TS_PORT=${TS_PORT}
-      - TS_NAME=${TS_NAME}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
       - ANCHOR_SYMBOL=KRW-USDT
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - TRADER_ADDRESS=trader:50051
     volumes:
       - ./log/cow:/app/log
-    networks:
-      - shared
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
 
 networks:
-  shared:
+  crypto-bridge:
     external: true
     name: crypto-bridge
