@@ -89,6 +89,51 @@ services:
       - ANCHOR_SYMBOL=KRW-USDT
       - TRADER_ADDRESS=trader:50051
 
+  move:
+    <<: *base-engine
+    container_name: cryptoquant_move_dev
+    labels:
+      engine: move
+      type: signal
+    env_file:
+      - env/.env.signal
+    environment:
+      - ENGINE_NAME=move
+      - BINANCE_SYMBOL=MOVEUSDT
+      - UPBIT_SYMBOL=KRW-MOVE
+      - ANCHOR_SYMBOL=KRW-USDT
+      - TRADER_ADDRESS=trader:50051
+
+  cow:
+    <<: *base-engine
+    container_name: cryptoquant_cow_dev
+    labels:
+      engine: cow
+      type: signal
+    env_file:
+      - env/.env.signal
+    environment:
+      - ENGINE_NAME=cow
+      - BINANCE_SYMBOL=COWUSDT
+      - UPBIT_SYMBOL=KRW-COW
+      - ANCHOR_SYMBOL=KRW-USDT
+      - TRADER_ADDRESS=trader:50051
+
+  eth:
+    <<: *base-engine
+    container_name: cryptoquant_eth_dev
+    labels:
+      engine: eth
+      type: signal
+    env_file:
+      - env/.env.signal
+    environment:
+      - ENGINE_NAME=eth
+      - BINANCE_SYMBOL=ETHUSDT
+      - UPBIT_SYMBOL=KRW-ETH
+      - ANCHOR_SYMBOL=KRW-USDT
+      - TRADER_ADDRESS=trader:50051
+      
 networks:
   crypto-dev:
     external: true

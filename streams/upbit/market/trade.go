@@ -17,7 +17,7 @@ const (
 	initialBackoff = 1 * time.Second
 	maxBackoff     = 30 * time.Second
 	// Add random delay between 0-5 seconds for initial connection
-	maxInitialDelay = 5 * time.Second
+	maxInitialDelay = 10 * time.Second
 )
 
 func SubscribeTrade(ctx context.Context, symbol string, handlers []func(upbitws.SpotTrade) error) error {

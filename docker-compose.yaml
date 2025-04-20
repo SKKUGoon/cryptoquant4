@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     restart: "no"
     env_file:
-      - .env
+      - env/.env.trader
     networks:
       - crypto-bridge
 
@@ -70,7 +70,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     env_file:
-      - .env
+      - env/.env.trader
     networks:
       - crypto-bridge
     volumes:
@@ -89,15 +89,13 @@ services:
       engine: xrp
       type: trader
     env_file:
-      - .env
+      - env/.env.signal
     environment:
       - ENGINE_NAME=xrp
       - BINANCE_SYMBOL=XRPUSDT
       - UPBIT_SYMBOL=KRW-XRP
       - ANCHOR_SYMBOL=KRW-USDT
       - TRADER_ADDRESS=trader:50051
-    volumes:
-      - ./log/xrp:/app/log
 
   move:
     <<: *base-engine
@@ -106,15 +104,13 @@ services:
       engine: move
       type: trader
     env_file:
-      - .env
+      - env/.env.signal
     environment:
       - ENGINE_NAME=move
       - BINANCE_SYMBOL=MOVEUSDT
       - UPBIT_SYMBOL=KRW-MOVE
       - ANCHOR_SYMBOL=KRW-USDT
       - TRADER_ADDRESS=trader:50051
-    volumes:
-      - ./log/cow:/app/log
 
   cow:
     <<: *base-engine
@@ -123,15 +119,13 @@ services:
       engine: cow
       type: trader
     env_file:
-      - .env
+      - env/.env.signal
     environment:
       - ENGINE_NAME=cow
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
       - ANCHOR_SYMBOL=KRW-USDT
       - TRADER_ADDRESS=trader:50051
-    volumes:
-      - ./log/cow:/app/log
 
 networks:
   crypto-bridge:

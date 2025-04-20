@@ -21,6 +21,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create trader server: %v", err)
 	}
+	tradingServer.StartKimchiTradeLog()
+	tradingServer.StartWalletLog()
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

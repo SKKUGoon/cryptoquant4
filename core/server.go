@@ -82,9 +82,12 @@ func NewTraderServer(ctx context.Context) (*Server, error) {
 
 	// Create trader
 	upbitTrader := upbittrade.NewTrader()
+	upbitTrader.UpdateRateLimit(1000)
 	binanceTrader := binancetrade.NewTrader()
+	binanceTrader.UpdateRateLimit(1000)
 
 	return &Server{
+		ctx:              ctx,
 		Account:          as,
 		UpbitPrecision:   upbitConfig,
 		BinancePrecision: binanceConfig,
@@ -171,6 +174,7 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 		}
 		executionTime = time.Now()
 
+		// Log orders
 		kimchiOrderLogs, err := s.CreateKimchiOrderLog(
 			order.PairOrder.UpbitOrder,
 			order.PairOrder.BinanceOrder,
