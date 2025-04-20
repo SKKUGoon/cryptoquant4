@@ -1,7 +1,6 @@
 package database_test
 
 import (
-	"fmt"
 	"testing"
 
 	"cryptoquant.com/m/data/database"
@@ -10,26 +9,6 @@ import (
 )
 
 const PGENVLOC = "../../.env"
-
-func TestGetBacktestData(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
-		t.Fatalf("Error loading .env file: %v", err)
-	}
-
-	db, err := database.ConnectDB()
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	prices1, prices2, err := db.GetBacktestData()
-	if err != nil {
-		t.Fatalf("Failed to import Nimbus data: %v", err)
-	}
-
-	fmt.Println(prices1)
-	fmt.Println(prices2)
-}
 
 func TestGetTradeMetadataString(t *testing.T) {
 	if err := godotenv.Load(PGENVLOC); err != nil {
