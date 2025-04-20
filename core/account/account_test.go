@@ -33,8 +33,6 @@ func TestAccountSource_Sync(t *testing.T) {
 
 	// Create account source
 	as := account.NewAccountSource(context.Background())
-	as.SetPrincipalCurrency("upbit", "KRW")
-	as.SetPrincipalCurrency("binance", "USDT")
 
 	err := as.UpdateRedis()
 	if err != nil {

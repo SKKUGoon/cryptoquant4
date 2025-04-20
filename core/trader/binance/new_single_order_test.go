@@ -20,7 +20,7 @@ func TestSendOrder(t *testing.T) {
 	trader := binancetrade.NewTrader()
 	trader.UpdateRateLimit(1000)
 	orderSheet := binancerest.NewTestOrderSheetLong()
-	result, err := trader.SendSingleOrder(*orderSheet)
+	result, err := trader.SendSingleOrder(orderSheet)
 	t.Log("Order sent")
 	if err != nil {
 		t.Fatalf("Failed to send order: %v", err)

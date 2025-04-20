@@ -8,6 +8,7 @@ import (
 	binancetrade "cryptoquant.com/m/core/trader/binance"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 )
 
 func TestTraderCycle(t *testing.T) {
@@ -23,7 +24,7 @@ func TestTraderCycle(t *testing.T) {
 	// Set leverage
 	levReq := &binancerest.LeverageRequest{
 		Symbol:    "BTCUSDT",
-		Leverage:  2,
+		Leverage:  1,
 		Timestamp: time.Now().UnixMilli(),
 	}
 	levResp, err := trader.SetLeverageTestServer(levReq)
@@ -32,11 +33,33 @@ func TestTraderCycle(t *testing.T) {
 	}
 	t.Logf("Leverage set: %+v", levResp)
 
-	// Send order
+	// Send order - market short
 	orderSheet := binancerest.NewTestOrderSheetMarketShort()
 	result, err := trader.SendSingleOrderTestServer(orderSheet)
 	if err != nil {
 		t.Fatalf("Failed to send order: %v", err)
 	}
-	t.Logf("Order sent: %+v", result)
+	t.Logf("Order sent: %+v", result.Success)
+	t.Logf("Order sent: %+v", result.Success.OrderID)
+	t.Logf("Order sent: %+v", result.Error)
+
+	// Sleep for 5 seconds
+	time.Sleep(5 * time.Second)
+
+	// Close order - exit position
+	quantity, _ := decimal.NewFromString("10")
+	test := &binancerest.OrderSheet{
+		Symbol:     "BTCUSDT",
+		Side:       "BUY",
+		Type:       "MARKET",
+		ReduceOnly: "true",
+		Quantity:   quantity,
+		Timestamp:  time.Now().UnixMilli(),
+	}
+	result, err = trader.SendSingleOrderTestServer(test)
+	if err != nil {
+		t.Fatalf("Failed to send order: %v", err)
+	}
+	t.Logf("Order sent: %+v", result.Success)
+	t.Logf("Order sent: %+v", result.Success.OrderID)
 }

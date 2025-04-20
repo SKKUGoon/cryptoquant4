@@ -6,7 +6,6 @@ import (
 	"cryptoquant.com/m/config"
 	"github.com/go-playground/assert"
 	"github.com/joho/godotenv"
-	"github.com/shopspring/decimal"
 )
 
 const PGENVLOC = "../.env"
@@ -22,12 +21,12 @@ func TestUpbitSpotTradeConfig(t *testing.T) {
 	}
 
 	upbit.UpdateExchangeInfo()
-	upbit.UpdateQuotingAsset("KRW")
-	upbit.UpdateMinimumTradeAmount()
-	upbit.UpdateUpbitPrecision()
+	upbit.SetPrincipalCurrency()
+	upbit.SetMinimumTradeAmount()
+	upbit.SetUpbitPrecisionSpecial()
 
-	assert.Equal(t, upbit.QuotingAsset, "KRW")
-	assert.Equal(t, upbit.MinimumTradeAmount, decimal.NewFromInt(5000))
-	assert.Equal(t, upbit.UpbitPrecition.KrwOneSymbols, []string{"KRW-ADA", "KRW-ALGO", "KRW-BLUR", "KRW-CELO", "KRW-ELF", "KRW-EOS", "KRW-GRS", "KRW-GRT", "KRW-ICX", "KRW-MANA", "KRW-MINA", "KRW-POL", "KRW-SAND", "KRW-SEI", "KRW-STG", "KRW-TRX"})
-	assert.Equal(t, upbit.UpbitPrecition.KrwPointFiveSymbols, []string{"KRW-USDT", "KRW-USDC"})
+	assert.Equal(t, upbit.PrincipalCurrency, "KRW")
+	assert.Equal(t, upbit.MinimumTradeAmount, 5000)
+	assert.Equal(t, upbit.UpbitPrecision.KrwOneSymbols, []string{"KRW-ADA", "KRW-ALGO", "KRW-BLUR", "KRW-CELO", "KRW-ELF", "KRW-EOS", "KRW-GRS", "KRW-GRT", "KRW-ICX", "KRW-MANA", "KRW-MINA", "KRW-POL", "KRW-SAND", "KRW-SEI", "KRW-STG", "KRW-TRX"})
+	assert.Equal(t, upbit.UpbitPrecision.KrwPointFiveSymbols, []string{"KRW-USDT", "KRW-USDC"})
 }

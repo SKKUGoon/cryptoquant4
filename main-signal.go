@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,14 +35,14 @@ func init() {
 
 	// Trade setup
 	// 1. Set leverage
-	maxLeverageKey := fmt.Sprintf("%v_max_leverage", symbol)
+	maxLeverageKey := fmt.Sprintf("binance_%v_max_leverage", strings.ToLower(symbol))
 	maxLeverage, err := db.GetTradeMetadata(maxLeverageKey, 1)
 	if err != nil {
 		log.Printf("Failed to get max leverage: %v", err)
 		panic(err)
 	}
 	trader := binancetrade.NewTrader()
-	trader.UpdateRateLimit(1000)
+	trader.UpdateRateLimit(2000)
 	levReq := &binancerest.LeverageRequest{
 		Symbol:    symbol,
 		Leverage:  maxLeverage.(int),

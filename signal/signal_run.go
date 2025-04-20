@@ -51,6 +51,7 @@ func (e *SignalContext) StartAssetPair() {
 	}
 
 	log.Printf("Asset Pairs(%v, %v, %v) initialized", e.UpbitAssetSymbol, e.BinanceAssetSymbol, e.AnchorAssetSymbol)
+	go e.UpbitBinancePairs.Run(e.ctx)
 }
 
 // StartAssetStreams starts the streams for the asset pairs.
@@ -96,8 +97,6 @@ func (e *SignalContext) StartAssetStreams() {
 // It creates a goroutine that runs the arbitrage strategy and tracks consecutive failures.
 // If the strategy is not ready, it logs an error and panics. Otherwise, it logs a message and starts the strategy.
 func (e *SignalContext) Run() {
-	log.Println("Starting strategy")
-	go e.UpbitBinancePairs.Run(e.ctx)
 
 	// TEST Send test trade once after 60 seconds
 	// TODO: Remove this after testing
@@ -119,14 +118,14 @@ func (e *SignalContext) Run() {
 						UpbitOrder: &traderpb.ExchangeOrder{
 							Symbol: e.UpbitAssetSymbol,
 							Side:   "buy",
-							Price:  1,
-							Amount: 1,
+							Price:  3010,
+							Amount: 11244457,
 						},
 						BinanceOrder: &traderpb.ExchangeOrder{
 							Symbol: e.BinanceAssetSymbol,
 							Side:   "sell",
-							Price:  1,
-							Amount: 1,
+							Price:  2.0844,
+							Amount: 138.4,
 						},
 					},
 				},

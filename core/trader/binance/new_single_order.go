@@ -10,7 +10,7 @@ import (
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 )
 
-func (t *Trader) SendSingleOrder(orderSheet binancerest.OrderSheet) (binancerest.OrderResult, error) {
+func (t *Trader) SendSingleOrder(orderSheet *binancerest.OrderSheet) (binancerest.OrderResult, error) {
 	const weight = 5
 	const urlBase = "https://fapi.binance.com/fapi/v1/order"
 	t.checkRateLimit(weight)

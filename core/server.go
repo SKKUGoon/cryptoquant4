@@ -6,9 +6,13 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
+	"cryptoquant.com/m/config"
 	"cryptoquant.com/m/core/account"
+	binancetrade "cryptoquant.com/m/core/trader/binance"
+	upbittrade "cryptoquant.com/m/core/trader/upbit"
 	pb "cryptoquant.com/m/gen/traderpb"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
@@ -20,46 +24,121 @@ const SAFE_MARGIN = 0.9
 // Trader gRPC server
 type Server struct {
 	pb.UnimplementedTraderServer
+
+	// Unified Account Manager
 	Account *account.AccountSource
+
+	// Exchange configurations - Vet precision
+	UpbitPrecision   *config.UpbitSpotTradeConfig
+	BinancePrecision *config.BinanceFutureTradeConfig
+
+	// Traders
+	UpbitTrader   *upbittrade.Trader
+	BinanceTrader *binancetrade.Trader
+}
+
+func NewTraderServer(ctx context.Context) (*Server, error) {
+	as := account.NewAccountSource(ctx)
+	err := as.Sync()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create exchange configs
+	upbitConfig, err := config.NewUpbitSpotTradeConfig()
+	if err != nil {
+		log.Printf("Failed to create Upbit config: %v", err)
+		panic(err)
+	}
+	binanceConfig, err := config.NewBinanceFutureTradeConfig()
+	if err != nil {
+		log.Printf("Failed to create Binance config: %v", err)
+		panic(err)
+	}
+
+	// Create trader
+	upbitTrader := upbittrade.NewTrader()
+	binanceTrader := binancetrade.NewTrader()
+
+	return &Server{
+		Account:          as,
+		UpbitPrecision:   upbitConfig,
+		BinancePrecision: binanceConfig,
+		UpbitTrader:      upbitTrader,
+		BinanceTrader:    binanceTrader,
+	}, nil
 }
 
 func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
+	var upbitOrderSheet *upbitrest.OrderSheet
+	var binanceOrderSheet *binancerest.OrderSheet
+
 	s.Account.Mu.Lock()
 	defer s.Account.Mu.Unlock()
 
 	switch order := req.OrderType.(type) {
+	// TODO: Add update exchange config method
 	case *pb.TradeRequest_PairOrder:
-		binanceWallet := s.Account.GetBinanceWalletSnapshot()
-		upbitWallet := s.Account.GetUpbitWalletSnapshot()
 
-		// Calculate the amount of the order for upbit and binance
-		upbitAmount, binanceAmount, err := calculateOrderAmount(
-			order.PairOrder.UpbitOrder,
-			order.PairOrder.BinanceOrder,
-			upbitWallet,
-			binanceWallet,
-			s.Account.UpbitPrincipalCurrency,
-			s.Account.BinancePrincipalCurrency,
-			order.PairOrder.ExchangeRate,
-		)
+		switch order.PairOrder.PairOrderType {
+		case pb.PairOrderType_PairOrderEnter: // Enter Upbit Long and Binance Short
+			// Calculate the amount of the order for upbit and binance
+			upbitAmount, binanceAmount, err := s.calculateOrderAmount(
+				order.PairOrder.UpbitOrder,
+				order.PairOrder.BinanceOrder,
+				s.Account.UpbitPrincipalCurrency,
+				s.Account.BinancePrincipalCurrency,
+				order.PairOrder.ExchangeRate,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			// Generate upbit order sheet (buy) + binance order sheet (sell)
+			if upbitOrderSheet = generateUpbitBuyOrderSheet(order.PairOrder.UpbitOrder, upbitAmount); upbitOrderSheet == nil {
+				return nil, fmt.Errorf("failed to generate upbit order sheet")
+			}
+
+			if binanceOrderSheet = generateBinanceSellOrderSheet(order.PairOrder.BinanceOrder, binanceAmount); binanceOrderSheet == nil {
+				return nil, fmt.Errorf("failed to generate binance order sheet")
+			}
+
+		case pb.PairOrderType_PairOrderExit: // Exit Upbit Short and Binance Long
+			// Get the amount of the order for upbit and binance
+			upbitWallet := s.Account.GetUpbitWalletSnapshot()
+			binanceWallet := s.Account.GetBinanceWalletSnapshot()
+
+			upbitWalletSymbol := strings.Replace(order.PairOrder.UpbitOrder.Symbol, "KRW-", "", 1) // e.g.) KRW-XRP -> XRP
+			upbitAmount, ok := upbitWallet[upbitWalletSymbol]
+			if !ok {
+				return nil, fmt.Errorf("upbit amount not found")
+			}
+			upbitOrderSheet = generateUpbitSellOrderSheet(order.PairOrder.UpbitOrder, upbitAmount)
+
+			binanceAmount, ok := binanceWallet[order.PairOrder.BinanceOrder.Symbol]
+			if !ok {
+				return nil, fmt.Errorf("binance amount not found")
+			}
+			binanceOrderSheet = generateBinanceBuyOrderSheet(order.PairOrder.BinanceOrder, binanceAmount)
+		default:
+			return nil, fmt.Errorf("invalid pair order type: %v", order.PairOrder.PairOrderType)
+		}
+
+		fmt.Printf("upbitOrderSheet: %+v\n", upbitOrderSheet)
+		fmt.Printf("binanceOrderSheet: %+v\n", binanceOrderSheet)
+
+		// Send orders
+		upbitResult, err := s.UpbitTrader.SendOrder(*upbitOrderSheet)
+		if err != nil {
+			return nil, err
+		}
+		binanceResult, err := s.BinanceTrader.SendSingleOrder(binanceOrderSheet)
 		if err != nil {
 			return nil, err
 		}
 
-		// Generate upbit order sheet
-		upbitOrderSheet, err := generateUpbitOrderSheet(order.PairOrder.UpbitOrder, upbitAmount)
-		if err != nil {
-			return nil, err
-		}
-
-		// Generate binance order sheet
-		binanceOrderSheet, err := generateBinanceOrderSheet(order.PairOrder.BinanceOrder, binanceAmount)
-		if err != nil {
-			return nil, err
-		}
-
-		log.Printf("Pair order: %v", upbitOrderSheet)
-		log.Printf("Binance order: %v", binanceOrderSheet)
+		fmt.Printf("upbitResult: %+v\n", upbitResult)
+		fmt.Printf("binanceResult: %+v\n", binanceResult)
 
 	case *pb.TradeRequest_SingleOrder:
 		// TODO: Implement single order
@@ -68,18 +147,28 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 		return &pb.OrderResponse{Success: false, Message: "Invalid order type"}, nil
 	}
 
+	// Update account
+	s.Account.UpdateRedis()
+	s.Account.Sync()
+
 	return &pb.OrderResponse{Success: true, Message: "Order submitted"}, nil
 }
 
 // calculateOrderAmount calculates the amount of the order for upbit and binance
 // based on the order and wallet information.
 // It returns the amount of the order for upbit and binance, and an error if there is one.
-func calculateOrderAmount(
+func (s *Server) calculateOrderAmount(
 	upbitOrder, binanceOrder *pb.ExchangeOrder,
-	upbitWallet, binanceWallet map[string]float64,
 	upbitPrincipalCurrency, binancePrincipalCurrency string,
 	exchangeRate float64, // KRW for USDT. e.g.) 1400KRW for 1USDT
 ) (float64, float64, error) { // upbitAmount, binanceAmount, error
+	// Necessary information
+	upbitWallet := s.Account.GetUpbitWalletSnapshot()
+	binanceWallet := s.Account.GetBinanceWalletSnapshot()
+	binancePrecision := s.BinancePrecision.GetSymbolPricePrecision(binanceOrder.Symbol)
+	upbitMinNotional := float64(s.UpbitPrecision.MinimumTradeAmount)
+	binanceMinNotional := float64(s.BinancePrecision.MinimumTradeAmount)
+
 	// Calculate the maximum amount of the order for upbit
 	upbitBookAvailable := upbitOrder.Amount * upbitOrder.Price * SAFE_MARGIN
 	upbitFund := upbitWallet[upbitPrincipalCurrency]
@@ -89,56 +178,65 @@ func calculateOrderAmount(
 	binanceFund := binanceWallet[binancePrincipalCurrency]
 
 	// Maximum available amount (minimum of the 4 values (bookAvailable, upbitFund, binanceFund, binanceAvailable))
-	maxAmount := math.Min(
+	maxNotional := math.Min(
 		math.Min(upbitBookAvailable/exchangeRate, upbitFund/exchangeRate),
 		math.Min(binanceBookAvailable, binanceFund),
 	)
 
-	// Calculate the amount of the order for upbit and binance
-	upbitAmount := maxAmount * exchangeRate         // Upbit needs Price * Quantity value
-	binanceAmount := maxAmount / binanceOrder.Price // Binance needs Quantity value
+	rawBinanceQty := maxNotional / binanceOrder.Price    // Step 2: Convert to raw Binance quantity (before rounding)
+	stepSize := math.Pow(10, -float64(binancePrecision)) // Step 3: Round down Binance quantity using step size
+	roundedBinanceQty := math.Floor(rawBinanceQty/stepSize) * stepSize
 
-	return upbitAmount, binanceAmount, nil
+	actualBinanceNotional := roundedBinanceQty * binanceOrder.Price // Step 4: Recalculate Binance notional based on rounded quantity
+	upbitNotional := actualBinanceNotional * exchangeRate           // Step 5: Calculate matching Upbit amount in KRW
+
+	if upbitNotional < upbitMinNotional {
+		return 0, 0, fmt.Errorf("upbit notional is less than minimum notional: %f", upbitNotional)
+	}
+
+	if roundedBinanceQty < binanceMinNotional {
+		return 0, 0, fmt.Errorf("binance notional is less than minimum notional: %f", roundedBinanceQty)
+	}
+
+	return upbitNotional, roundedBinanceQty, nil
 }
 
-func generateUpbitOrderSheet(order *pb.ExchangeOrder, orderSpec float64) (*upbitrest.OrderSheet, error) {
-	switch order.Side {
-	case "buy":
-		return &upbitrest.OrderSheet{
-			Symbol:  order.Symbol,
-			Side:    "bid",
-			Price:   strconv.FormatFloat(orderSpec, 'f', -1, 64),
-			OrdType: "market",
-		}, nil
-
-	case "sell":
-		// Only need to specify amount
-		return &upbitrest.OrderSheet{
-			Symbol:  order.Symbol,
-			Side:    "ask",
-			Volume:  strconv.FormatFloat(orderSpec, 'f', -1, 64),
-			OrdType: "market",
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid order side: %v", order.Side)
+func generateUpbitBuyOrderSheet(order *pb.ExchangeOrder, upbitAmount float64) *upbitrest.OrderSheet {
+	return &upbitrest.OrderSheet{
+		Symbol:  order.Symbol,
+		Side:    "bid",
+		Price:   strconv.FormatFloat(upbitAmount, 'f', -1, 64),
+		OrdType: "price",
 	}
 }
 
-func generateBinanceOrderSheet(order *pb.ExchangeOrder, orderSpec float64) (*binancerest.OrderSheet, error) {
-	switch order.Side {
-	case "buy":
-		// To binance, buy order is exit order
-		return &binancerest.OrderSheet{}, nil
-	case "sell":
-		timestamp := time.Now().UnixMilli()
-		return &binancerest.OrderSheet{
-			Symbol:    order.Symbol,
-			Side:      "SELL",
-			Quantity:  decimal.NewFromFloat(orderSpec),
-			Type:      "MARKET",
-			Timestamp: timestamp,
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid order side: %v", order.Side)
+func generateUpbitSellOrderSheet(order *pb.ExchangeOrder, upbitAmount float64) *upbitrest.OrderSheet {
+	return &upbitrest.OrderSheet{
+		Symbol:  order.Symbol,
+		Side:    "ask",
+		Volume:  strconv.FormatFloat(upbitAmount, 'f', -1, 64),
+		OrdType: "market",
+	}
+}
+
+func generateBinanceBuyOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) *binancerest.OrderSheet {
+	return &binancerest.OrderSheet{
+		Symbol:     order.Symbol,
+		Side:       "BUY",
+		Quantity:   decimal.NewFromFloat(binanceAmount * 1.0005), // NOTE: Buffer of 0.05% ensure all position closed (Reduce only)
+		ReduceOnly: "true",
+		Type:       "MARKET",
+		Timestamp:  time.Now().UnixMilli(),
+	}
+}
+
+func generateBinanceSellOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) *binancerest.OrderSheet {
+	timestamp := time.Now().UnixMilli()
+	return &binancerest.OrderSheet{
+		Symbol:    order.Symbol,
+		Side:      "SELL",
+		Quantity:  decimal.NewFromFloat(binanceAmount),
+		Type:      "MARKET",
+		Timestamp: timestamp,
 	}
 }

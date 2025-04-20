@@ -9,7 +9,6 @@ import (
 	"net"
 
 	core "cryptoquant.com/m/core"
-	account "cryptoquant.com/m/core/account"
 	pb "cryptoquant.com/m/gen/traderpb"
 	"google.golang.org/grpc"
 )
@@ -18,11 +17,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Account source
-	as := account.NewAccountSource(ctx)
-	err := as.Sync() // Initial sync after startup (on init will do the initiation data import to Redis)
+	tradingServer, err := core.NewTraderServer(ctx)
 	if err != nil {
-		log.Fatalf("failed to sync account source: %v", err)
+		log.Fatalf("failed to create trader server: %v", err)
 	}
 
 	lis, err := net.Listen("tcp", ":50051")
@@ -31,7 +28,7 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	pb.RegisterTraderServer(server, &core.Server{Account: as})
+	pb.RegisterTraderServer(server, tradingServer)
 
 	log.Printf("Server listening at %v", lis.Addr())
 	if err := server.Serve(lis); err != nil {

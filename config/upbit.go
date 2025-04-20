@@ -6,7 +6,6 @@ import (
 
 	database "cryptoquant.com/m/data/database"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
-	"github.com/shopspring/decimal"
 )
 
 // UpbitSpotTradeConfig is a struct that contains the configuration for the Upbit spot trade
@@ -17,19 +16,19 @@ import (
 //   - KrwPointFiveSymbols: List of symbols with precision 0.5
 type UpbitSpotTradeConfig struct {
 	ExchangeInfo *upbitrest.SpotExchanges
+	db           *database.Database
 
 	// List of symbols to exclude from trading
 	ExcludeTrades map[string]bool
 
 	// Trading Parameters
 	// Upbit needs UpbitPrecision to be set - Binance does not need it
-	UpbitPrecition struct {
+	UpbitPrecision struct {
 		KrwOneSymbols       map[string]bool
 		KrwPointFiveSymbols map[string]bool
 	}
-	MinimumTradeAmount decimal.Decimal
-	FundSize           float32
-	QuotingAsset       string
+	MinimumTradeAmount int // In KRW
+	PrincipalCurrency  string
 }
 
 func NewUpbitSpotTradeConfig() (*UpbitSpotTradeConfig, error) {
@@ -38,9 +37,15 @@ func NewUpbitSpotTradeConfig() (*UpbitSpotTradeConfig, error) {
 		return nil, err
 	}
 
+	db, err := database.ConnectDB()
+	if err != nil {
+		return nil, err
+	}
+
 	return &UpbitSpotTradeConfig{
 		ExchangeInfo: exchangeInfo,
-		UpbitPrecition: struct {
+		db:           db,
+		UpbitPrecision: struct {
 			KrwOneSymbols       map[string]bool
 			KrwPointFiveSymbols map[string]bool
 		}{
@@ -58,18 +63,17 @@ func (e *UpbitSpotTradeConfig) UpdateExchangeInfo() {
 	}
 }
 
-func (e *UpbitSpotTradeConfig) UpdateQuotingAsset(quote string) {
-	e.QuotingAsset = quote
-}
-
-func (e *UpbitSpotTradeConfig) UpdateMinimumTradeAmount() {
-	db, err := database.ConnectDB()
+func (e *UpbitSpotTradeConfig) SetPrincipalCurrency() {
+	principalCurrency, err := e.db.GetTradeMetadata("upbit_principal_currency", "KRW")
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	amount, err := db.GetTradeMetadata("upbit_minimum_trade_amount", decimal.NewFromInt(1000))
+	e.PrincipalCurrency = principalCurrency.(string)
+}
+
+func (e *UpbitSpotTradeConfig) SetMinimumTradeAmount() {
+	amount, err := e.db.GetTradeMetadata("upbit_minimum_trade_amount", 1000)
 	if err != nil {
 		panic(err)
 	}
@@ -79,12 +83,10 @@ func (e *UpbitSpotTradeConfig) UpdateMinimumTradeAmount() {
 		panic("upbit_minimum_trade_amount is not an int")
 	}
 
-	amountInt64 := int64(amountInt)
-
-	e.MinimumTradeAmount = decimal.NewFromInt(amountInt64)
+	e.MinimumTradeAmount = amountInt
 }
 
-func (e *UpbitSpotTradeConfig) UpdateUpbitPrecision() {
+func (e *UpbitSpotTradeConfig) SetUpbitPrecisionSpecial() {
 	e.upbitPricePrecisionKrwOne()
 	e.upbitPricePrecisionKrwPointFive()
 }
@@ -110,7 +112,7 @@ func (e *UpbitSpotTradeConfig) upbitPricePrecisionKrwOne() {
 	for _, s := range strings.Split(symbolsStr.(string), ",") {
 		symbols[strings.TrimSpace(s)] = true
 	}
-	e.UpbitPrecition.KrwOneSymbols = symbols
+	e.UpbitPrecision.KrwOneSymbols = symbols
 }
 
 func (e *UpbitSpotTradeConfig) upbitPricePrecisionKrwPointFive() {
@@ -134,57 +136,58 @@ func (e *UpbitSpotTradeConfig) upbitPricePrecisionKrwPointFive() {
 	for _, s := range strings.Split(symbolsStr.(string), ",") {
 		symbols[strings.TrimSpace(s)] = true
 	}
-	e.UpbitPrecition.KrwPointFiveSymbols = symbols
+	e.UpbitPrecision.KrwPointFiveSymbols = symbols
 }
 
 func (e *UpbitSpotTradeConfig) IsAvailableSymbol(symbol string) bool {
 	return e.ExchangeInfo.IsSymbolAvailable(symbol)
 }
 
-func (e *UpbitSpotTradeConfig) AuditOrderSheetPrecision(orderSheet *upbitrest.OrderSheet) error {
-	// NOTE: Upbit does not have precision for each symbol
-	// NOTE: Upbit ordersheet only requires total amount of money you want to spend
+func (e *UpbitSpotTradeConfig) GetSymbolPricePrecision(symbol string, price float64) float32 {
+	switch e.PrincipalCurrency {
+	case "KRW":
+		if _, ok := e.UpbitPrecision.KrwOneSymbols[symbol]; ok {
+			return 1
+		}
 
-	// symbolAffiliation := func(symbol string) string {
-	// 	if e.UpbitPrecition.KrwOneSymbols[symbol] {
-	// 		return "UPBIT_KRW_ONE" // Special case for Upbit. Its precision is set
-	// 	}
+		if _, ok := e.UpbitPrecision.KrwPointFiveSymbols[symbol]; ok {
+			return 0.5
+		}
 
-	// 	if e.UpbitPrecition.KrwPointFiveSymbols[symbol] {
-	// 		return "UPBIT_KRW_POINT_FIVE"
-	// 	}
+		// Else
+		switch true {
+		case price >= 2_000_000:
+			return 1000
+		case price < 2_000_000 && price >= 1_000_000:
+			return 500
+		case price < 1_000_000 && price >= 500_000:
+			return 100
+		case price < 500_000 && price >= 100_000:
+			return 50
+		case price < 100_000 && price >= 10_000:
+			return 10
+		case price < 10_000 && price >= 1_000:
+			return 1
+		case price < 1_000 && price >= 100:
+			return 0.1
+		case price < 100 && price >= 10:
+			return 0.01
+		case price < 10 && price >= 1:
+			return 0.001
+		case price < 1 && price > 0.1:
+			return 0.0001
+		case price < 0.1 && price >= 0.01:
+			return 0.00001
+		case price < 0.01 && price >= 0.001:
+			return 0.000001
+		case price < 0.001 && price >= 0.0001:
+			return 0.0000001
+		default:
+			return 0.00000001
+		}
 
-	// 	return "NORMAL"
-	// }
-
-	// // Audit symbol precision
-	// switch symbolAffiliation(orderSheet.Symbol) {
-	// case "UPBIT_KRW_ONE":
-	// 	pricePrecision := 1
-	// 	if orderSheet.Price != "" {
-	// 		price, err := decimal.NewFromString(orderSheet.Price)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		roundedPrice := price.Round(int32(pricePrecision))
-	// 		orderSheet.Price = roundedPrice.String()
-	// 	}
-	// case "UPBIT_KRW_POINT_FIVE":
-	// 	if orderSheet.Price != "" {
-	// 		// Multiply by 2 to work with whole numbers
-	// 		price, err := decimal.NewFromString(orderSheet.Price)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		scaled := price.Mul(decimal.NewFromFloat(2))
-	// 		// Round to nearest integer
-	// 		rounded := scaled.Round(0)
-	// 		// Divide by 2 to get back to 0.5 precision
-	// 		orderSheet.Price = rounded.Div(decimal.NewFromFloat(2)).String()
-	// 	}
-	// default:
-	// 	return nil
-	// }
-
-	return nil
+	default:
+		log.Fatalln("Quoting asset is not supported", e.PrincipalCurrency)
+		return 0
+	}
 }

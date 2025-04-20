@@ -74,14 +74,14 @@ type SignalContext struct {
 
 func New(ctx context.Context) *SignalContext {
 	// 1. Get engine name
-	engineName := os.Getenv("ENGINE_NAME")
-	if engineName == "" {
+	signalEngineName := os.Getenv("ENGINE_NAME")
+	if signalEngineName == "" {
 		panic("ENGINE_NAME is not set")
 	}
 
 	// 2. Create a new context with cancellation
 	// Controls the lifecycle of the whole engine and daemon structs and streams
-	engineCtx, cancel := context.WithCancel(ctx)
+	signalCtx, cancel := context.WithCancel(ctx)
 
 	// 3. Connect to database
 	db, err := database.ConnectDB()
@@ -96,7 +96,7 @@ func New(ctx context.Context) *SignalContext {
 	}
 
 	// 4. Create exchange configs
-	kimchiConfig, err := config.NewUpbitSpotTradeConfig()
+	upbitConfig, err := config.NewUpbitSpotTradeConfig()
 	if err != nil {
 		log.Printf("Failed to create Upbit config: %v", err)
 		panic(err)
@@ -124,11 +124,11 @@ func New(ctx context.Context) *SignalContext {
 
 	// 7. Create struct with order channels
 	engine := &SignalContext{
-		SignalID:              engineName,
-		ctx:                   engineCtx,
+		SignalID:              signalEngineName,
+		ctx:                   signalCtx,
 		cancel:                cancel,
 		traderMessenger:       traderMessenger,
-		UpbitExchangeConfig:   kimchiConfig,
+		UpbitExchangeConfig:   upbitConfig,
 		BinanceExchangeConfig: binanceConfig,
 		Database:              db,
 		TimeScale:             ts,
