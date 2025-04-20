@@ -8,10 +8,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const PGENVLOC = "../../.env"
+const ENV_LOC = "../../.env.local"
 
 func TestGetTradeMetadataString(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
@@ -30,7 +30,7 @@ func TestGetTradeMetadataString(t *testing.T) {
 }
 
 func TestGetTradeMetadataInt(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
@@ -49,7 +49,7 @@ func TestGetTradeMetadataInt(t *testing.T) {
 }
 
 func TestGetTradeMetadataFloat(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
@@ -68,7 +68,7 @@ func TestGetTradeMetadataFloat(t *testing.T) {
 }
 
 func TestGetTradeMetadataBool(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
@@ -87,7 +87,7 @@ func TestGetTradeMetadataBool(t *testing.T) {
 }
 
 func TestGetTradeMetadataStringArray(t *testing.T) {
-	if err := godotenv.Load(PGENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 

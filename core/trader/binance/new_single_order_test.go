@@ -10,8 +10,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const ENV_PATH = "../../../.env.local"
-
 func TestSendOrder(t *testing.T) {
 	if err := godotenv.Load(ENV_PATH); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)

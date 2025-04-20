@@ -11,3 +11,11 @@ func StringToFloat64(v string) float64 {
 func StringToString(v string) string {
 	return v
 }
+
+func ConvertToAnySlice[T any](slice []T) []any {
+	result := make([]any, len(slice))
+	for i, v := range slice {
+		result[i] = v
+	}
+	return result
+}

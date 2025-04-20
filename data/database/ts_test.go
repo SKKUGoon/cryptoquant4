@@ -7,10 +7,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const TSENVLOC = "../../.env"
-
 func TestConnectTS(t *testing.T) {
-	if err := godotenv.Load(TSENVLOC); err != nil {
+	if err := godotenv.Load(ENV_LOC); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 

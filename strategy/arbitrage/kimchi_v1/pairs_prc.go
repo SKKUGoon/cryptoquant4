@@ -189,18 +189,14 @@ func (p *UpbitBinancePair) ToPremiumLog() database.PremiumLog {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return database.PremiumLog{
-		Timestamp:       time.Now(),
-		Symbol:          p.KimchiAsset.Symbol,
-		Premium:         p.Premium,
-		PremiumEnterPos: p.EnterPremium,
-		PremiumExitPos:  p.ExitPremium,
-		KimchiPrice:     p.KimchiPrice,
-		AnchorPrice:     p.AnchorPrice,
-		CefiPrice:       p.CefiPrice,
-		KimchiBestBid:   p.KimchiBestBid,
-		KimchiBestAsk:   p.KimchiBestAsk,
-		CefiBestBid:     p.CefiBestBid,
-		CefiBestAsk:     p.CefiBestAsk,
+		Timestamp:     time.Now(),
+		Symbol:        p.KimchiAsset.Symbol,
+		AnchorPrice:   p.AnchorPrice,
+		CefiPrice:     p.CefiPrice,
+		KimchiBestBid: p.KimchiBestBid,
+		KimchiBestAsk: p.KimchiBestAsk,
+		CefiBestBid:   p.CefiBestBid,
+		CefiBestAsk:   p.CefiBestAsk,
 	}
 }
 
