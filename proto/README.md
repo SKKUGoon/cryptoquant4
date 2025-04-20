@@ -22,3 +22,10 @@ option go_package = "cryptoquant.com/m/gen/traderpb";
 1. Declares the proto version
 2. Organizes the proto under a Go package for namespacing after generation
 
+### How to use?
+
+After editing the proto messages use this command in your cli
+
+```bash
+protoc --proto_path=proto  --go_out=gen/traderpb --go-grpc_out=gen/traderpb --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative trader.proto 
+```

@@ -117,12 +117,14 @@ func (e *SignalContext) Run() {
 						UpbitOrder: &traderpb.ExchangeOrder{
 							Symbol:    e.UpbitAssetSymbol,
 							Side:      "buy",
+							Price:     1,
 							Amount:    1,
 							AmountKey: traderpb.AmountKey_TOTAL_VALUE,
 						},
 						BinanceOrder: &traderpb.ExchangeOrder{
 							Symbol:    e.BinanceAssetSymbol,
 							Side:      "sell",
+							Price:     1,
 							Amount:    1,
 							AmountKey: traderpb.AmountKey_QUANTITY,
 						},

@@ -67,41 +67,37 @@ func (a *AccountSource) syncRedisFromBinance() error {
 
 	// Save to redis - Assets (Quoting)
 	for _, asset := range account.Assets {
-		fmt.Println("asset", asset.Asset)
-		var total, available float64
+		var total float64
 		if total, err = strconv.ParseFloat(asset.WalletBalance, 64); err != nil {
-			return err
-		}
-		if available, err = strconv.ParseFloat(asset.AvailableBalance, 64); err != nil {
 			return err
 		}
 
 		// Store individual currency balance
-		if err := a.SetPosition("binance", asset.Asset, available); err != nil {
+		if err := a.UpdateRedisPosition("binance", asset.Asset, total); err != nil {
 			return err
 		}
-		fmt.Printf("Account: Binance %s balance: %f, available: %f\n", asset.Asset, total, available)
+		fmt.Printf("Account: Binance %s balance: %f\n", asset.Asset, total)
 
-		snapshot[asset.Asset] = available
+		snapshot[asset.Asset] = total
 	}
 
 	// Save to redis - Positions (Quoting)
 
 	for _, position := range account.Positions {
-		fmt.Println("position", position.Symbol)
 		if total, err = strconv.ParseFloat(position.PositionAmt, 64); err != nil {
 			return err
 		}
 		available = total // TODO: For now, it's market order only.
 
-		if err := a.SetPosition("binance", position.Symbol, total); err != nil {
+		if err := a.UpdateRedisPosition("binance", position.Symbol, total); err != nil {
 			return err
 		}
 
 		snapshot[position.Symbol] = available
+		fmt.Printf("Position: Binance %s balance: %f, available: %f\n", position.Symbol, total, available)
 	}
 
-	if err := a.SetWalletSnapshot("binance", snapshot); err != nil {
+	if err := a.UpdateRedisWalletSnapshot("binance", snapshot); err != nil {
 		return err
 	}
 	return nil

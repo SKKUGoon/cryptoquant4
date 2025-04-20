@@ -15,7 +15,6 @@ import (
 
 func (a *AccountSource) syncRedisFromUpbit() error {
 	var balance float64
-	var reserved float64
 	var account upbitrest.Accounts
 	var snapshot = make(map[string]float64)
 	const urlBase = "https://api.upbit.com/v1/accounts"
@@ -61,37 +60,22 @@ func (a *AccountSource) syncRedisFromUpbit() error {
 
 	for _, acc := range account {
 		currency := acc.Currency
-
 		if balance, err = strconv.ParseFloat(acc.Balance, 64); err != nil {
-			return err
-		}
-		if reserved, err = strconv.ParseFloat(acc.Locked, 64); err != nil {
 			return err
 		}
 
 		// Store individual currency balance
-		if err := a.SetPosition("upbit", currency, balance); err != nil {
+		if err := a.UpdateRedisPosition("upbit", currency, balance); err != nil {
 			return err
 		}
-		fmt.Printf("Account: Upbit %s balance: %f, reserved: %f\n", currency, balance, reserved)
+		fmt.Printf("Account: Upbit %s balance: %f\n", currency, balance)
 
 		// Store in snapshot map
 		snapshot[currency] = balance
-
-		// Save KRW available to internal fund
-		if currency == "KRW" {
-			a.UpbitFund.AvailableFund = balance
-			if err := a.setRedisAvailableFund("upbit", balance-reserved); err != nil {
-				return err
-			}
-			if err := a.syncRedisReservedFund("upbit", reserved); err != nil {
-				return err
-			}
-		}
 	}
 
 	// Save snapshot to redis
-	if err := a.SetWalletSnapshot("upbit", snapshot); err != nil {
+	if err := a.UpdateRedisWalletSnapshot("upbit", snapshot); err != nil {
 		return err
 	}
 

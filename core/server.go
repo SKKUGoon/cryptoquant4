@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"cryptoquant.com/m/core/account"
 	pb "cryptoquant.com/m/gen/traderpb"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
@@ -16,9 +17,13 @@ import (
 // Trader gRPC server
 type Server struct {
 	pb.UnimplementedTraderServer
+	Account *account.AccountSource
 }
 
 func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
+	s.Account.Mu.Lock()
+	defer s.Account.Mu.Unlock()
+
 	switch order := req.OrderType.(type) {
 	case *pb.TradeRequest_PairOrder:
 		// Generate upbit order sheet
@@ -49,14 +54,16 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 func generateUpbitOrderSheet(order *pb.ExchangeOrder) (*upbitrest.OrderSheet, error) {
 	switch order.Side {
 	case "buy":
+		pq := order.Amount * order.Price
 		return &upbitrest.OrderSheet{
 			Symbol:  order.Symbol,
 			Side:    "bid",
-			Price:   strconv.FormatFloat(order.Amount, 'f', -1, 64),
+			Price:   strconv.FormatFloat(pq, 'f', -1, 64),
 			OrdType: "market",
 		}, nil
 
 	case "sell":
+		// Only need to specify amount
 		return &upbitrest.OrderSheet{
 			Symbol:  order.Symbol,
 			Side:    "ask",

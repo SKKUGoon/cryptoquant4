@@ -16,8 +16,9 @@ message ExchangeOrder {
   string exchange = 1;        // "upbit", "binance", etc.
   string symbol = 2;          // e.g., "BTCUSDT" for binance, "BTC-KRW" for upbit
   string side = 3;            // "buy" or "sell"
-  double amount = 4;
-  AmountKey amount_key = 5;   // Describes what `amount` means
+  double price = 4;           // Best Bid or Ask price
+  double amount = 5;          // Best Bid or Ask amount
+  AmountKey amount_key = 6;   // Describes what `amount` means
 }
 
 // --- Order types ---

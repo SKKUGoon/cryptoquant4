@@ -8,13 +8,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const ENV_PATH = "../../.env.local"
+
 func TestAccountSource_OnInit(t *testing.T) {
-	if err := godotenv.Load("../.env"); err != nil {
+	if err := godotenv.Load(ENV_PATH); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
 	// Create account source
 	as := account.NewAccountSource(context.Background())
+	as.SetPrincipalCurrency("upbit", "KRW")
+	as.SetPrincipalCurrency("binance", "USDT")
 
 	// Init account source
 	if err := as.OnInit(); err != nil {
@@ -23,17 +27,24 @@ func TestAccountSource_OnInit(t *testing.T) {
 }
 
 func TestAccountSource_Sync(t *testing.T) {
-	if err := godotenv.Load("../.env"); err != nil {
+	if err := godotenv.Load(ENV_PATH); err != nil {
 		t.Fatalf("Error loading .env file: %v", err)
 	}
 
 	// Create account source
-	as := account.NewAccountSourceSync(context.Background())
+	as := account.NewAccountSource(context.Background())
+	as.SetPrincipalCurrency("upbit", "KRW")
+	as.SetPrincipalCurrency("binance", "USDT")
 
-	// Check if redis's information is inserted
+	err := as.UpdateRedis()
+	if err != nil {
+		t.Fatalf("failed to update account source: %v", err)
+	}
+	err = as.Sync()
+	if err != nil {
+		t.Fatalf("failed to sync account source: %v", err)
+	}
 
-	t.Log("Upbit Fund")
-	t.Logf("%+v", as.UpbitFund)
-	t.Log("Binance Fund")
-	t.Logf("%+v", as.BinanceFund)
+	t.Logf("binance reserved fund: %v", as.GetBinanceWalletSnapshot())
+	t.Logf("upbit reserved fund: %v", as.GetUpbitWalletSnapshot())
 }
