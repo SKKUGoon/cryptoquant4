@@ -93,7 +93,46 @@ func (d *Database) GetTradeMetadata(key string, defaultValue any) (any, error) {
 }
 
 // ExportTradeLog exports trade log data
-func (d *Database) ExportTradeLog() error {
+func (d *Database) InsertStrategyKimchiOrderLog(logs []KimchiOrderLog) error {
+	if len(logs) == 0 {
+		return nil
+	}
 
+	tx, err := d.db.Begin()
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %v", err)
+	}
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO cryptoquant.strategy_kimchi_order_logs (pair_id, order_time, execution_time, pair_side, exchange, side, order_price, executed_price, anchor_price)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error preparing statement: %v", err)
+	}
+	defer stmt.Close()
+
+	for _, log := range logs {
+		_, err := stmt.Exec(
+			log.PairID,
+			log.OrderTime,
+			log.ExecutionTime,
+			log.PairSide,
+			log.Exchange,
+			log.Side,
+			log.OrderPrice,
+			log.ExecutedPrice,
+			log.AnchorPrice,
+		)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("error executing statement: %v", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("error committing transaction: %v", err)
+	}
 	return nil
 }

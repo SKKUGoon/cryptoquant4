@@ -4,28 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"time"
 )
 
 type TimeScale struct {
 	db *sql.DB
-}
-
-type PremiumLog struct {
-	Timestamp       time.Time
-	ReceivedAt      time.Time
-	Symbol          string
-	Premium         float64
-	PremiumEnterPos float64
-	PremiumExitPos  float64
-	KimchiPrice     float64
-	AnchorPrice     float64
-	CefiPrice       float64
-	// Best Bid and Ask
-	KimchiBestBid float64
-	KimchiBestAsk float64
-	CefiBestBid   float64
-	CefiBestAsk   float64
 }
 
 func ConnectTS() (*TimeScale, error) {
@@ -65,8 +47,8 @@ func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
 
 	// Prepare the statement
 	stmt, err := tx.Prepare(`
-		INSERT INTO premium_logs (time, symbol, kimchi_price, anchor_price, cefi_price, kimchi_best_bid, kimchi_best_ask, cefi_best_bid, cefi_best_ask)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO cryptoquant.premium_logs (time, symbol, anchor_price, kimchi_best_bid, kimchi_best_ask, cefi_best_bid, cefi_best_ask)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -79,9 +61,7 @@ func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
 		_, err := stmt.Exec(
 			log.Timestamp,
 			log.Symbol,
-			log.KimchiPrice,
 			log.AnchorPrice,
-			log.CefiPrice,
 			log.KimchiBestBid,
 			log.KimchiBestAsk,
 			log.CefiBestBid,

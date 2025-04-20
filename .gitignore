@@ -31,7 +31,6 @@ go.work.sum
 *.sqlite
 *.sqlite3
 /log/*
-/data/*
 
 # Binaries
 bin/
