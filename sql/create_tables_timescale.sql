@@ -20,3 +20,11 @@ CREATE TABLE IF NOT EXISTS cryptoquant.account_snapshots (
     wallet_balance_krw DOUBLE PRECISION NOT NULL
 );
 SELECT create_hypertable('cryptoquant.account_snapshots', 'time', if_not_exists => TRUE);
+
+CREATE TABLE IF NOT EXISTS cryptoquant.emergency_shutdown_logs (
+    time                 TIMESTAMPTZ NOT NULL,
+    position_clear_success    JSONB,
+    note                 TEXT
+);
+
+SELECT create_hypertable('cryptoquant.emergency_shutdown_logs', 'time', if_not_exists => TRUE);

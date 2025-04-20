@@ -4,35 +4,50 @@
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A cryptocurrency quantitative analysis and trading platform built with Go.
+A sophisticated cryptocurrency arbitrage and trading platform built with Go, focusing on price differences between Binance and Upbit exchanges.
 
 ## Overview
 
-This system implements a trading strategy that:
-- Monitors price differences between Binance and Upbit exchanges
-- Executes trades when profitable opportunities are identified
-- Supports multiple trading pairs (XRP, COW, etc.)
-- Uses Redis for caching and real-time data
-- Implements WebSocket connections for real-time market data
-- Supports both development and production environments
+This system implements a high-frequency trading strategy that:
+- Monitors and exploits price differences (premium) between Binance and Upbit exchanges
+- Executes pair trades (long-short positions) when profitable opportunities are identified
+- Supports multiple trading pairs with configurable parameters
+- Implements real-time market data processing through WebSocket connections
+- Features a unified account management system
+- Provides comprehensive trade logging and analysis capabilities
 
 ## Project Structure
 
 ```
 .
-├── engine/                 # Core trading engine
-│   ├── trade/             # Exchange-specific trading implementations
-│   │   ├── binance/       # Binance trading implementation
-│   │   └── upbit/         # Upbit trading implementation
-│   └── strategy/          # Trading strategies
-├── internal/              # Internal packages
-│   ├── binance/           # Binance API clients
-│   └── upbit/             # Upbit API clients
-├── streams/               # WebSocket stream handlers
-│   ├── binance/           # Binance WebSocket streams
-│   └── upbit/             # Upbit WebSocket streams
-└── main-*.go              # Entry points for different build targets
+├── core/                  # Core trading engine and server implementation
+│   ├── account/          # Unified account management
+│   ├── trader/           # Exchange-specific trading implementations
+│   │   ├── binance/      # Binance trading implementation
+│   │   └── upbit/        # Upbit trading implementation
+├── internal/             # Internal packages
+│   ├── binance/          # Binance API clients
+│   └── upbit/            # Upbit API clients
+├── data/                 # Database and data management
+│   ├── database/         # Database connections and models
+│   └── timescale/        # Time series data management
+├── signal/               # Signal processing and analysis
+├── strategy/             # Trading strategies
+├── proto/                # Protocol buffer definitions
+├── gen/                  # Generated protocol buffer code
+├── config/               # Configuration management
+├── utils/                # Utility functions
+└── main-*.go             # Entry points for different services
 ```
+
+## Key Features
+
+- **Unified Account Management**: Centralized account handling across multiple exchanges
+- **Precision Trading**: Configurable precision settings for different exchanges
+- **Real-time Monitoring**: WebSocket-based market data streaming
+- **Trade Execution**: Automated order placement with safety margins
+- **Data Analysis**: Comprehensive trade logging and premium tracking
+- **Docker Support**: Development and production environments
 
 ## Prerequisites
 
@@ -64,17 +79,11 @@ BINANCE_SECRET_KEY=your_binance_secret_key
 UPBIT_API_KEY=your_upbit_api_key
 UPBIT_SECRET_KEY=your_upbit_secret_key
 
-# Trading Pairs
-BINANCE_SYMBOL=XRPUSDT
-UPBIT_SYMBOL=KRW-XRP
-ANCHOR_SYMBOL=KRW-USDT
+# Trading Configuration
+SAFE_MARGIN=0.9  # Safety margin for order execution
 ```
 
 ## Development Setup
-
-Prerequisites are:
-- Postgres 
-- Timescale DB
 
 1. Create the Docker network:
 ```bash
@@ -88,8 +97,9 @@ docker compose -f docker-compose.dev.yaml up --build
 
 This will start:
 - Redis for caching
-- Initialization service
-- Trading services for each pair (XRP, COW, etc.)
+- Database services
+- Trading services
+- Signal processing services
 
 ## Production Setup
 
@@ -105,38 +115,40 @@ docker-compose up --build
 
 ## Build Targets
 
-The project supports different build targets:
+The project supports multiple build targets:
 
-- `init`: Initializes Redis and performs setup tasks
-- `server`: Runs the trading services
-- Default: Development environment with debugging tools
-
-## Monitoring
-
-- Development: Access pprof at `localhost:6060`
-- Logs are stored in `./log/{engine_name}/`
-- Redis metrics available on port 6379
+- `init`: Initializes the system and performs setup tasks
+- `trader`: Runs the main trading services
+- `signal`: Runs signal processing services
+- `local`: Development environment with debugging tools
 
 ## Architecture
 
-### Trading Engine
-- Implements high-frequency trading strategies
-- Monitors multiple trading pairs simultaneously
-- Uses WebSocket connections for real-time data
-- Implements order book management
-- Handles trade execution and position management
+### Core Components
 
-### Data Flow
-1. WebSocket streams receive real-time market data
-2. Trading engine processes data and identifies opportunities
-3. Orders are executed when profitable conditions are met
-4. Results are logged to TimescaleDB for analysis
+1. **Trading Server**
+   - gRPC-based server implementation
+   - Unified account management
+   - Order execution and position management
+   - Trade logging and analysis
 
-### Security
-- API keys are managed through environment variables
-- Secure WebSocket connections
+2. **Exchange Integration**
+   - Binance and Upbit API clients
+   - WebSocket stream handlers
+   - Order book management
+   - Precision handling
+
+3. **Data Management**
+   - PostgreSQL for relational data
+   - TimescaleDB for time series data
+   - Redis for caching and real-time data
+
+### Security Features
+
+- Secure API key management
+- Encrypted WebSocket connections
 - Rate limiting and error handling
-- Proper cleanup of sensitive data
+- Safe margin implementation for order execution
 
 ## Contributing
 

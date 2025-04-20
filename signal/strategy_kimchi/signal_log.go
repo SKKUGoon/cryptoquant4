@@ -1,4 +1,4 @@
-package signal
+package signalkimchi
 
 import (
 	"log"
@@ -16,7 +16,7 @@ func (e *SignalContext) StartTSLog() {
 			select {
 			case <-e.ctx.Done():
 				return
-			case row := <-e.tsLog:
+			case row := <-e.premiumLog:
 				buffer = append(buffer, row)
 				if len(buffer) >= 100 {
 					bufferCopy := make([]database.PremiumLog, len(buffer))

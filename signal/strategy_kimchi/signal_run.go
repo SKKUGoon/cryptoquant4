@@ -1,4 +1,4 @@
-package signal
+package signalkimchi
 
 import (
 	"log"
@@ -97,47 +97,7 @@ func (e *SignalContext) StartAssetStreams() {
 // It creates a goroutine that runs the arbitrage strategy and tracks consecutive failures.
 // If the strategy is not ready, it logs an error and panics. Otherwise, it logs a message and starts the strategy.
 func (e *SignalContext) Run() {
-
-	// TEST Send test trade once after 60 seconds
-	// TODO: Remove this after testing
-	go func() {
-		timer := time.NewTimer(60 * time.Second)
-		defer timer.Stop()
-
-		select {
-		case <-e.ctx.Done():
-			return
-		case <-timer.C:
-			log.Println("Sending one-time test trade after 60 seconds")
-			_, err := e.traderMessenger.SubmitTrade(&traderpb.TradeRequest{
-				OrderType: &traderpb.TradeRequest_PairOrder{
-					PairOrder: &traderpb.PairOrderSheet{
-						BaseSymbol:    e.SignalID,
-						PairOrderType: traderpb.PairOrderType_PairOrderEnter,
-						ExchangeRate:  1430,
-						UpbitOrder: &traderpb.ExchangeOrder{
-							Symbol: e.UpbitAssetSymbol,
-							Side:   "buy",
-							Price:  3010,
-							Amount: 11244457,
-						},
-						BinanceOrder: &traderpb.ExchangeOrder{
-							Symbol: e.BinanceAssetSymbol,
-							Side:   "sell",
-							Price:  2.0844,
-							Amount: 138.4,
-						},
-					},
-				},
-			})
-			if err != nil {
-				log.Printf("Failed to submit test trade: %v", err)
-			}
-			log.Println("Test trade submitted")
-			return // Exit goroutine after single execution
-		}
-	}()
-
+	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
 		for {
 			select {
@@ -206,7 +166,14 @@ func (e *SignalContext) Run() {
 						e.ChangePositionStatus()
 					}
 				}
-				// log.Printf("Premium: %v (enter. %v), %v (exit. %v)", enter, e.EnterPremiumBoundary, exit, e.ExitPremiumBoundary)
+			case <-ticker.C:
+				select {
+				case e.premiumLog <- e.UpbitBinancePairs.ToPremiumLog():
+					// log pushed successfully
+				default:
+					// Skip this log to avoid blocking signal loop
+					log.Println("[WARNING] premiumLog buffer full — skipping")
+				}
 			}
 		}
 	}()

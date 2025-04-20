@@ -1,4 +1,4 @@
-package signal
+package signalkimchi
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	config "cryptoquant.com/m/config"
 	database "cryptoquant.com/m/data/database"
+	signal "cryptoquant.com/m/signal"
 	kimchiarbv1 "cryptoquant.com/m/strategy/arbitrage/kimchi_v1"
 )
 
@@ -23,7 +24,7 @@ type SignalContext struct {
 	wg     sync.WaitGroup
 
 	// To Trader - Submit trade
-	traderMessenger *TraderMessenger
+	traderMessenger *signal.TraderMessenger
 
 	// Exchange configurations - Check if the symbols are available
 	UpbitExchangeConfig   *config.UpbitSpotTradeConfig
@@ -68,8 +69,8 @@ type SignalContext struct {
 	inPosition  bool
 	premiumChan chan [3]float64 // [EnterPremium, ExitPremium]
 
-	// To Database - Logging premium
-	tsLog chan database.PremiumLog
+	// Logging channel
+	premiumLog chan database.PremiumLog
 }
 
 func New(ctx context.Context) *SignalContext {
@@ -120,7 +121,7 @@ func New(ctx context.Context) *SignalContext {
 		log.Println("Failed to confirm trader address: Environment variables not set")
 		panic("Environment variables not set")
 	}
-	traderMessenger := NewTraderMessenger(traderAddr, ctx)
+	traderMessenger := signal.NewTraderMessenger(traderAddr, ctx)
 
 	// 7. Create struct with order channels
 	engine := &SignalContext{
@@ -157,7 +158,7 @@ func New(ctx context.Context) *SignalContext {
 		inPosition:  false,
 		premiumChan: make(chan [3]float64),
 
-		tsLog: make(chan database.PremiumLog),
+		premiumLog: make(chan database.PremiumLog, 100),
 	}
 
 	log.Println("Engine initialized")

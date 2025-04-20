@@ -9,13 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"cryptoquant.com/m/config"
-	"cryptoquant.com/m/core/account"
+	config "cryptoquant.com/m/config"
+	account "cryptoquant.com/m/core/account"
 	binancetrade "cryptoquant.com/m/core/trader/binance"
 	upbittrade "cryptoquant.com/m/core/trader/upbit"
+	database "cryptoquant.com/m/data/database"
 	pb "cryptoquant.com/m/gen/traderpb"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -24,6 +26,8 @@ const SAFE_MARGIN = 0.9
 // Trader gRPC server
 type Server struct {
 	pb.UnimplementedTraderServer
+
+	ctx context.Context
 
 	// Unified Account Manager
 	Account *account.AccountSource
@@ -35,6 +39,14 @@ type Server struct {
 	// Traders
 	UpbitTrader   *upbittrade.Trader
 	BinanceTrader *binancetrade.Trader
+
+	// Data
+	Database  *database.Database  // Get trade parameters
+	TimeScale *database.TimeScale // Log premium data
+
+	// Logging channel
+	kimchiTradeLog chan database.KimchiOrderLog
+	walletLog      chan database.AccountSnapshot
 }
 
 func NewTraderServer(ctx context.Context) (*Server, error) {
@@ -56,6 +68,18 @@ func NewTraderServer(ctx context.Context) (*Server, error) {
 		panic(err)
 	}
 
+	// Connect to database
+	db, err := database.ConnectDB()
+	if err != nil {
+		log.Printf("Failed to connect to database: %v", err)
+		panic(err)
+	}
+	ts, err := database.ConnectTS()
+	if err != nil {
+		log.Printf("Failed to connect to TimeScale: %v", err)
+		panic(err)
+	}
+
 	// Create trader
 	upbitTrader := upbittrade.NewTrader()
 	binanceTrader := binancetrade.NewTrader()
@@ -66,12 +90,18 @@ func NewTraderServer(ctx context.Context) (*Server, error) {
 		BinancePrecision: binanceConfig,
 		UpbitTrader:      upbitTrader,
 		BinanceTrader:    binanceTrader,
+		Database:         db,
+		TimeScale:        ts,
+		kimchiTradeLog:   make(chan database.KimchiOrderLog, 100),
+		walletLog:        make(chan database.AccountSnapshot, 100),
 	}, nil
 }
 
 func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
 	var upbitOrderSheet *upbitrest.OrderSheet
 	var binanceOrderSheet *binancerest.OrderSheet
+	var orderTime time.Time
+	var executionTime time.Time
 
 	s.Account.Mu.Lock()
 	defer s.Account.Mu.Unlock()
@@ -128,17 +158,33 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 		fmt.Printf("binanceOrderSheet: %+v\n", binanceOrderSheet)
 
 		// Send orders
+		orderTime = time.Now()
 		upbitResult, err := s.UpbitTrader.SendOrder(*upbitOrderSheet)
 		if err != nil {
+			s.KimchiPremiumEject()
 			return nil, err
 		}
 		binanceResult, err := s.BinanceTrader.SendSingleOrder(binanceOrderSheet)
 		if err != nil {
+			s.KimchiPremiumEject()
 			return nil, err
 		}
+		executionTime = time.Now()
 
-		fmt.Printf("upbitResult: %+v\n", upbitResult)
-		fmt.Printf("binanceResult: %+v\n", binanceResult)
+		kimchiOrderLogs, err := s.CreateKimchiOrderLog(
+			order.PairOrder.UpbitOrder,
+			order.PairOrder.BinanceOrder,
+			order.PairOrder.ExchangeRate,
+			&upbitResult,
+			&binanceResult,
+			orderTime,
+			executionTime,
+		)
+		if err != nil {
+			s.KimchiPremiumEject()
+			return nil, err
+		}
+		s.kimchiTradeLog <- kimchiOrderLogs[0]
 
 	case *pb.TradeRequest_SingleOrder:
 		// TODO: Implement single order

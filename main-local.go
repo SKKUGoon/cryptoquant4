@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	sig "cryptoquant.com/m/signal"
+	sig "cryptoquant.com/m/signal/strategy_kimchi"
 	"github.com/joho/godotenv"
 )
 

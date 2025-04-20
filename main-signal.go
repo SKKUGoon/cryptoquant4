@@ -16,7 +16,7 @@ import (
 	binancetrade "cryptoquant.com/m/core/trader/binance"
 	database "cryptoquant.com/m/data/database"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
-	sig "cryptoquant.com/m/signal"
+	sig "cryptoquant.com/m/signal/strategy_kimchi"
 )
 
 func init() {
