@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -76,7 +77,7 @@ func (a *AccountSource) syncRedisFromBinance() error {
 		if err := a.UpdateRedisPosition("binance", asset.Asset, total); err != nil {
 			return err
 		}
-		fmt.Printf("Account: Binance %s balance: %f\n", asset.Asset, total)
+		log.Printf("Account: Binance %s balance: %f\n", asset.Asset, total)
 
 		snapshot[asset.Asset] = total
 	}
@@ -94,7 +95,7 @@ func (a *AccountSource) syncRedisFromBinance() error {
 		}
 
 		snapshot[position.Symbol] = available
-		fmt.Printf("Position: Binance %s balance: %f, available: %f\n", position.Symbol, total, available)
+		log.Printf("Position: Binance %s balance: %f, available: %f\n", position.Symbol, total, available)
 	}
 
 	if err := a.UpdateRedisWalletSnapshot("binance", snapshot); err != nil {

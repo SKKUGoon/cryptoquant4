@@ -67,11 +67,15 @@ func NewAccountSource(ctx context.Context) *AccountSource {
 	}
 	log.Printf("Redis connected: %s", pong)
 
+	// Environment variables
 	binancePubkey := os.Getenv("BINANCE_API_KEY")
 	binancePrikey := os.Getenv("BINANCE_SECRET_KEY")
 
 	upbitPubkey := os.Getenv("UPBIT_API_KEY")
 	upbitPrikey := os.Getenv("UPBIT_SECRET_KEY")
+
+	upbitPrincipalCurrency := os.Getenv("UPBIT_PRINCIPAL_CURRENCY")
+	binancePrincipalCurrency := os.Getenv("BINANCE_PRINCIPAL_CURRENCY")
 
 	return &AccountSource{
 		Redis: rdb,
@@ -82,6 +86,9 @@ func NewAccountSource(ctx context.Context) *AccountSource {
 
 		upbitPubkey: upbitPubkey,
 		upbitPrikey: upbitPrikey,
+
+		UpbitPrincipalCurrency:   upbitPrincipalCurrency,
+		BinancePrincipalCurrency: binancePrincipalCurrency,
 	}
 }
 

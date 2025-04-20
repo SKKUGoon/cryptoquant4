@@ -37,7 +37,7 @@ type UpbitBinancePair struct {
 	KimchiBestAsk    float64
 	KimchiBestAskQty float64 // Calculate how much market can take
 
-	PremiumChan chan [2]float64 // [EnterPremium, ExitPremium]
+	PremiumChan chan [3]float64 // [EnterPremium, ExitPremium]
 }
 
 func (p *UpbitBinancePair) Run(ctx context.Context) {
@@ -112,7 +112,7 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 			continue
 		}
 
-		p.PremiumChan <- [2]float64{p.EnterPremium, p.ExitPremium}
+		p.PremiumChan <- [3]float64{p.EnterPremium, p.ExitPremium, p.AnchorPrice}
 	}
 }
 

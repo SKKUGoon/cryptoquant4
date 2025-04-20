@@ -113,20 +113,20 @@ func (e *SignalContext) Run() {
 			_, err := e.traderMessenger.SubmitTrade(&traderpb.TradeRequest{
 				OrderType: &traderpb.TradeRequest_PairOrder{
 					PairOrder: &traderpb.PairOrderSheet{
-						BaseSymbol: e.SignalID,
+						BaseSymbol:    e.SignalID,
+						PairOrderType: traderpb.PairOrderType_PairOrderEnter,
+						ExchangeRate:  1430,
 						UpbitOrder: &traderpb.ExchangeOrder{
-							Symbol:    e.UpbitAssetSymbol,
-							Side:      "buy",
-							Price:     1,
-							Amount:    1,
-							AmountKey: traderpb.AmountKey_TOTAL_VALUE,
+							Symbol: e.UpbitAssetSymbol,
+							Side:   "buy",
+							Price:  1,
+							Amount: 1,
 						},
 						BinanceOrder: &traderpb.ExchangeOrder{
-							Symbol:    e.BinanceAssetSymbol,
-							Side:      "sell",
-							Price:     1,
-							Amount:    1,
-							AmountKey: traderpb.AmountKey_QUANTITY,
+							Symbol: e.BinanceAssetSymbol,
+							Side:   "sell",
+							Price:  1,
+							Amount: 1,
 						},
 					},
 				},
@@ -145,29 +145,30 @@ func (e *SignalContext) Run() {
 			case <-e.ctx.Done():
 				return
 			case premiums := <-e.premiumChan:
-				enter := premiums[0]
-				exit := premiums[1]
+				enterPremium := premiums[0]
+				exitPremium := premiums[1]
+				exchangeRate := premiums[2]
 
 				switch true {
-				case e.inPosition && exit > e.ExitPremiumBoundary:
-					log.Printf("Exiting position: %v (standard: %v)", exit, e.ExitPremiumBoundary)
+				case e.inPosition && exitPremium > e.ExitPremiumBoundary:
+					log.Printf("Exiting position: %v (standard: %v)", exitPremium, e.ExitPremiumBoundary)
 
 					// TODO: Send Exit Position order signal with protobuf
 					_, err := e.traderMessenger.SubmitTrade(&traderpb.TradeRequest{
 						OrderType: &traderpb.TradeRequest_PairOrder{
 							PairOrder: &traderpb.PairOrderSheet{
-								BaseSymbol: e.SignalID,
+								BaseSymbol:    e.SignalID,
+								PairOrderType: traderpb.PairOrderType_PairOrderExit,
+								ExchangeRate:  exchangeRate,
 								UpbitOrder: &traderpb.ExchangeOrder{
-									Symbol:    e.UpbitAssetSymbol,
-									Side:      "sell",
-									Amount:    1,
-									AmountKey: traderpb.AmountKey_TOTAL_VALUE,
+									Symbol: e.UpbitAssetSymbol,
+									Side:   "sell",
+									Amount: 1,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
-									Symbol:    e.BinanceAssetSymbol,
-									Side:      "buy",
-									Amount:    1,
-									AmountKey: traderpb.AmountKey_QUANTITY,
+									Symbol: e.BinanceAssetSymbol,
+									Side:   "buy",
+									Amount: 1,
 								},
 							},
 						},
@@ -178,24 +179,24 @@ func (e *SignalContext) Run() {
 						e.ChangePositionStatus()
 					}
 
-				case !e.inPosition && enter < e.EnterPremiumBoundary:
-					log.Printf("Entering position: %v (standard: %v)", enter, e.EnterPremiumBoundary)
+				case !e.inPosition && enterPremium < e.EnterPremiumBoundary:
+					log.Printf("Entering position: %v (standard: %v)", enterPremium, e.EnterPremiumBoundary)
 
 					_, err := e.traderMessenger.SubmitTrade(&traderpb.TradeRequest{
 						OrderType: &traderpb.TradeRequest_PairOrder{
 							PairOrder: &traderpb.PairOrderSheet{
-								BaseSymbol: e.SignalID,
+								BaseSymbol:    e.SignalID,
+								PairOrderType: traderpb.PairOrderType_PairOrderEnter,
+								ExchangeRate:  exchangeRate,
 								UpbitOrder: &traderpb.ExchangeOrder{
-									Symbol:    e.UpbitAssetSymbol,
-									Side:      "buy",
-									Amount:    1,
-									AmountKey: traderpb.AmountKey_TOTAL_VALUE,
+									Symbol: e.UpbitAssetSymbol,
+									Side:   "buy",
+									Amount: 1,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
-									Symbol:    e.BinanceAssetSymbol,
-									Side:      "sell",
-									Amount:    1,
-									AmountKey: traderpb.AmountKey_QUANTITY,
+									Symbol: e.BinanceAssetSymbol,
+									Side:   "sell",
+									Amount: 1,
 								},
 							},
 						},

@@ -66,7 +66,7 @@ type SignalContext struct {
 
 	// Trading Channel
 	inPosition  bool
-	premiumChan chan [2]float64 // [EnterPremium, ExitPremium]
+	premiumChan chan [3]float64 // [EnterPremium, ExitPremium]
 
 	// To Database - Logging premium
 	tsLog chan database.PremiumLog
@@ -155,7 +155,7 @@ func New(ctx context.Context) *SignalContext {
 		anchorBestBidQtyChan:  make(chan float64),
 
 		inPosition:  false,
-		premiumChan: make(chan [2]float64),
+		premiumChan: make(chan [3]float64),
 
 		tsLog: make(chan database.PremiumLog),
 	}

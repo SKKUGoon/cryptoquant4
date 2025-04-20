@@ -2,8 +2,8 @@ package account
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -68,7 +68,7 @@ func (a *AccountSource) syncRedisFromUpbit() error {
 		if err := a.UpdateRedisPosition("upbit", currency, balance); err != nil {
 			return err
 		}
-		fmt.Printf("Account: Upbit %s balance: %f\n", currency, balance)
+		log.Printf("Account: Upbit %s balance: %f\n", currency, balance)
 
 		// Store in snapshot map
 		snapshot[currency] = balance

@@ -5,10 +5,10 @@ package trader;
 option go_package = "cryptoquant.com/m/gen/traderpb";
 
 // --- ENUM for clarity ---
-enum AmountKey {
-  AMOUNT_UNSPECIFIED = 0;
-  QUANTITY = 1;         // raw coin quantity
-  TOTAL_VALUE = 2;      // e.g., 1,000,000 KRW or 800 USDT
+enum PairOrderType {
+  PairOrderTypeUnspecified = 0;
+  PairOrderEnter = 1;        // Bet on Long Premium
+  PairOrderExit = 2;         // Bet on Short Premium
 }
 
 // --- Generalized exchange order ---
@@ -18,7 +18,6 @@ message ExchangeOrder {
   string side = 3;            // "buy" or "sell"
   double price = 4;           // Best Bid or Ask price
   double amount = 5;          // Best Bid or Ask amount
-  AmountKey amount_key = 6;   // Describes what `amount` means
 }
 
 // --- Order types ---
@@ -31,10 +30,11 @@ message SingleOrderSheet {
 
 message PairOrderSheet {
   string base_symbol = 1;
-  string quote_symbol = 2;
-  ExchangeOrder upbit_order = 3;
-  ExchangeOrder binance_order = 4;
-  string reason = 5;
+  double exchange_rate = 2;
+  PairOrderType pair_order_type = 3;
+  ExchangeOrder upbit_order = 4;
+  ExchangeOrder binance_order = 5;
+  string reason = 6;
 }
 
 // --- Polymorphic Request ---

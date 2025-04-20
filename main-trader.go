@@ -19,7 +19,11 @@ func main() {
 	defer cancel()
 
 	// Account source
-	as := account.NewAccountSourceSync(ctx)
+	as := account.NewAccountSource(ctx)
+	err := as.Sync() // Initial sync after startup (on init will do the initiation data import to Redis)
+	if err != nil {
+		log.Fatalf("failed to sync account source: %v", err)
+	}
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
