@@ -41,6 +41,7 @@ func (s *Server) StartWalletLog() {
 }
 
 func (s *Server) CreateKimchiOrderLog(
+	isPairEnter bool,
 	upbitOrder *pb.ExchangeOrder,
 	binanceOrder *pb.ExchangeOrder,
 	anchorPrice float64,
@@ -48,12 +49,13 @@ func (s *Server) CreateKimchiOrderLog(
 	binanceResp *binancerest.OrderResult,
 	orderTime, executionTime time.Time,
 ) ([]database.KimchiOrderLog, error) {
-	uuid := uuid.New().String()
+	var pairSide string
+	var uuid = uuid.New().String()
 
-	upbitPrice, err := strconv.ParseFloat(upbitResp.Success.Price, 64)
-	if err != nil {
-		log.Printf("Failed to parse upbit price: %v", err)
-		return nil, err
+	if isPairEnter {
+		pairSide = "long"
+	} else {
+		pairSide = "short"
 	}
 
 	binancePrice, err := strconv.ParseFloat(binanceResp.Success.Price, 64)
@@ -66,11 +68,10 @@ func (s *Server) CreateKimchiOrderLog(
 		PairID:        uuid,
 		OrderTime:     orderTime,
 		ExecutionTime: executionTime,
-		PairSide:      "long",
+		PairSide:      pairSide,
 		Exchange:      "upbit",
 		Side:          upbitOrder.Side,
 		OrderPrice:    upbitOrder.Price,
-		ExecutedPrice: upbitPrice,
 		AnchorPrice:   anchorPrice,
 	}
 
@@ -78,7 +79,7 @@ func (s *Server) CreateKimchiOrderLog(
 		PairID:        uuid,
 		OrderTime:     orderTime,
 		ExecutionTime: executionTime,
-		PairSide:      "long",
+		PairSide:      pairSide,
 		Exchange:      "binance",
 		Side:          binanceOrder.Side,
 		OrderPrice:    binanceOrder.Price,

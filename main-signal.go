@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	account "cryptoquant.com/m/core/account"
 	binancetrade "cryptoquant.com/m/core/trader/binance"
 	database "cryptoquant.com/m/data/database"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
@@ -61,10 +62,29 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Initialize account. Check if the account is inPosition or not
+	csymbol := os.Getenv("BINANCE_SYMBOL")
+	ksymbol := os.Getenv("UPBIT_SYMBOL")
+	ksymbol = strings.ReplaceAll(ksymbol, "KRW-", "")
+
+	act := account.NewAccountSource(ctx)
+	act.Sync()
+	upbitWallet := act.GetUpbitWalletSnapshot()
+	binanceWallet := act.GetBinanceWalletSnapshot()
+
+	_, oku := upbitWallet[ksymbol]
+	_, okb := binanceWallet[csymbol]
+
 	// Initialize engine with production settings
 	engine := sig.New(ctx)
 	engine.ConfirmTargetSymbols()
 	engine.ConfirmTradeParameters()
+
+	if oku && okb {
+		engine.ChangePositionStatus() // Set to inPosition
+	} else if oku && !okb || !oku && okb {
+		panic("Account in inconsistent state")
+	}
 
 	// Start all necessary components
 	engine.StartAssetPair()

@@ -21,7 +21,7 @@ import (
 )
 
 const SAFE_MARGIN = 0.9
-const USE_FUND_UPPER_BOUND = 0.8 // 80% of the fund is used
+const USE_FUND_UPPER_BOUND = 0.5 // 80% of the fund is used
 
 // Trader gRPC server
 type Server struct {
@@ -109,6 +109,7 @@ func NewTraderServer(ctx context.Context) (*Server, error) {
 }
 
 func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
+	var isPairEnter bool
 	var upbitOrderSheet *upbitrest.OrderSheet
 	var binanceOrderSheet *binancerest.OrderSheet
 	var orderTime time.Time
@@ -132,7 +133,8 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 		// Pair Order
 		// - Deals with pair entry and pair exit
 		switch order.PairOrder.PairOrderType {
-		case pb.PairOrderType_PairOrderEnter: // Enter Upbit Long and Binance Short
+		case pb.PairOrderType_PairOrderEnter: // Enter Upbit Long and Binance Short. Loading my position
+			isPairEnter = true
 			upbitAmount, binanceAmount, err := s.calculateOrderAmount(
 				order.PairOrder.UpbitOrder,
 				order.PairOrder.BinanceOrder,
@@ -153,8 +155,8 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 				return nil, err
 			}
 
-		case pb.PairOrderType_PairOrderExit: // Exit Upbit Short and Binance Long
-			// Get the amount of the order for upbit and binance
+		case pb.PairOrderType_PairOrderExit: // Exit Upbit Short and Binance Long. Unloading my position
+			isPairEnter = false
 			upbitWallet := s.Account.GetUpbitWalletSnapshot()
 			binanceWallet := s.Account.GetBinanceWalletSnapshot()
 
@@ -200,6 +202,7 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 
 		// Log orders
 		kimchiOrderLogs, err := s.CreateKimchiOrderLog(
+			isPairEnter,
 			order.PairOrder.UpbitOrder,
 			order.PairOrder.BinanceOrder,
 			order.PairOrder.ExchangeRate,
