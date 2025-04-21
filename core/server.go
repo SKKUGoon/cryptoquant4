@@ -17,8 +17,7 @@ import (
 	pb "cryptoquant.com/m/gen/traderpb"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
-
-	"github.com/shopspring/decimal"
+	"cryptoquant.com/m/utils"
 )
 
 const SAFE_MARGIN = 0.9
@@ -105,9 +104,15 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 	var binanceOrderSheet *binancerest.OrderSheet
 	var orderTime time.Time
 	var executionTime time.Time
-
+	var err error
 	s.Account.Mu.Lock()
 	defer s.Account.Mu.Unlock()
+	defer func() {
+		log.Println("--------------------------------")
+		log.Printf("upbitOrderSheet: %+v\n", upbitOrderSheet)
+		log.Printf("binanceOrderSheet: %+v\n", binanceOrderSheet)
+		log.Println("--------------------------------")
+	}()
 
 	switch order := req.OrderType.(type) {
 	// TODO: Add update exchange config method
@@ -132,8 +137,8 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 				return nil, fmt.Errorf("failed to generate upbit order sheet")
 			}
 
-			if binanceOrderSheet = generateBinanceSellOrderSheet(order.PairOrder.BinanceOrder, binanceAmount); binanceOrderSheet == nil {
-				return nil, fmt.Errorf("failed to generate binance order sheet")
+			if binanceOrderSheet, err = generateBinanceSellOrderSheet(order.PairOrder.BinanceOrder, binanceAmount); err != nil {
+				return nil, err
 			}
 
 		case pb.PairOrderType_PairOrderExit: // Exit Upbit Short and Binance Long
@@ -141,24 +146,27 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 			upbitWallet := s.Account.GetUpbitWalletSnapshot()
 			binanceWallet := s.Account.GetBinanceWalletSnapshot()
 
+			// Misc job to generate the order sheet
 			upbitWalletSymbol := strings.Replace(order.PairOrder.UpbitOrder.Symbol, "KRW-", "", 1) // e.g.) KRW-XRP -> XRP
 			upbitAmount, ok := upbitWallet[upbitWalletSymbol]
 			if !ok {
 				return nil, fmt.Errorf("upbit amount not found")
 			}
-			upbitOrderSheet = generateUpbitSellOrderSheet(order.PairOrder.UpbitOrder, upbitAmount)
-
 			binanceAmount, ok := binanceWallet[order.PairOrder.BinanceOrder.Symbol]
 			if !ok {
 				return nil, fmt.Errorf("binance amount not found")
 			}
-			binanceOrderSheet = generateBinanceBuyOrderSheet(order.PairOrder.BinanceOrder, binanceAmount)
+
+			// Generate the order sheet
+			if upbitOrderSheet = generateUpbitSellOrderSheet(order.PairOrder.UpbitOrder, upbitAmount); upbitOrderSheet == nil {
+				return nil, fmt.Errorf("failed to generate upbit order sheet")
+			}
+			if binanceOrderSheet, err = generateBinanceBuyOrderSheet(order.PairOrder.BinanceOrder, binanceAmount); err != nil {
+				return nil, err
+			}
 		default:
 			return nil, fmt.Errorf("invalid pair order type: %v", order.PairOrder.PairOrderType)
 		}
-
-		fmt.Printf("upbitOrderSheet: %+v\n", upbitOrderSheet)
-		fmt.Printf("binanceOrderSheet: %+v\n", binanceOrderSheet)
 
 		// Send orders
 		orderTime = time.Now()
@@ -269,24 +277,34 @@ func generateUpbitSellOrderSheet(order *pb.ExchangeOrder, upbitAmount float64) *
 	}
 }
 
-func generateBinanceBuyOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) *binancerest.OrderSheet {
+func generateBinanceBuyOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) (*binancerest.OrderSheet, error) {
+	safeDecimal, err := utils.SafeDecimalFromFloat(binanceAmount * 1.0005)
+	if err != nil {
+		return nil, err
+	}
+
 	return &binancerest.OrderSheet{
 		Symbol:     order.Symbol,
 		Side:       "BUY",
-		Quantity:   decimal.NewFromFloat(binanceAmount * 1.0005), // NOTE: Buffer of 0.05% ensure all position closed (Reduce only)
+		Quantity:   safeDecimal, // NOTE: Buffer of 0.05% ensure all position closed (Reduce only)
 		ReduceOnly: "true",
 		Type:       "MARKET",
 		Timestamp:  time.Now().UnixMilli(),
-	}
+	}, nil
 }
 
-func generateBinanceSellOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) *binancerest.OrderSheet {
+func generateBinanceSellOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) (*binancerest.OrderSheet, error) {
+	safeDecimal, err := utils.SafeDecimalFromFloat(binanceAmount)
+	if err != nil {
+		return nil, err
+	}
+
 	timestamp := time.Now().UnixMilli()
 	return &binancerest.OrderSheet{
 		Symbol:    order.Symbol,
 		Side:      "SELL",
-		Quantity:  decimal.NewFromFloat(binanceAmount),
+		Quantity:  safeDecimal,
 		Type:      "MARKET",
 		Timestamp: timestamp,
-	}
+	}, nil
 }
