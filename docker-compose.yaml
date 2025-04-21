@@ -89,7 +89,7 @@ services:
       engine: xrp
       type: signal
     env_file:
-      - env/.env.signal
+      - env/.env.trader
     environment:
       - ENGINE_NAME=xrp
       - BINANCE_SYMBOL=XRPUSDT
@@ -104,7 +104,7 @@ services:
       engine: move
       type: signal
     env_file:
-      - env/.env.signal
+      - env/.env.trader
     environment:
       - ENGINE_NAME=move
       - BINANCE_SYMBOL=MOVEUSDT
@@ -119,7 +119,7 @@ services:
       engine: cow
       type: signal
     env_file:
-      - env/.env.signal
+      - env/.env.trader
     environment:
       - ENGINE_NAME=cow
       - BINANCE_SYMBOL=COWUSDT
@@ -134,7 +134,7 @@ services:
       engine: eth
       type: signal
     env_file:
-      - env/.env.signal
+      - env/.env.trader
     environment:
       - ENGINE_NAME=eth
       - BINANCE_SYMBOL=ETHUSDT
