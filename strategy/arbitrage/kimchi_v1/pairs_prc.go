@@ -15,7 +15,7 @@ import (
 )
 
 type UpbitBinancePair struct {
-	mu          sync.Mutex
+	Mu          sync.Mutex
 	KimchiAsset *Asset
 	AnchorAsset *Asset // USDTKRW
 	CefiAsset   *Asset // Foreign Binance
@@ -46,63 +46,63 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case anchorPrice := <-p.AnchorAsset.priceChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.AnchorPrice = anchorPrice
 			p.calculatePremium()
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		// Cefi
 		case cefiPrice := <-p.CefiAsset.priceChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.CefiPrice = cefiPrice
 			p.calculatePremium()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case cefibbp := <-p.CefiAsset.bestBidPrcChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.CefiBestBid = cefibbp
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case cefibap := <-p.CefiAsset.bestAskPrcChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.CefiBestAsk = cefibap
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case cefibbq := <-p.CefiAsset.bestBidQtyChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.CefiBestBidQty = cefibbq
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case cefibaq := <-p.CefiAsset.bestAskQtyChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.CefiBestAskQty = cefibaq
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		// Kimchi
 		case kimchiPrice := <-p.KimchiAsset.priceChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.KimchiPrice = kimchiPrice
 			p.calculatePremium()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case kimchiBestBid := <-p.KimchiAsset.bestBidPrcChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.KimchiBestBid = kimchiBestBid
 			p.calculatePremiumEnterPos()
 			p.calculatePremiumExitPos()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case kimchiBestAsk := <-p.KimchiAsset.bestAskPrcChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.KimchiBestAsk = kimchiBestAsk
 			p.calculatePremiumEnterPos()
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case kimchiBestBidQty := <-p.KimchiAsset.bestBidQtyChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.KimchiBestBidQty = kimchiBestBidQty
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		case kimchiBestAskQty := <-p.KimchiAsset.bestAskQtyChan:
-			p.mu.Lock()
+			p.Mu.Lock()
 			p.KimchiBestAskQty = kimchiBestAskQty
-			p.mu.Unlock()
+			p.Mu.Unlock()
 		}
 
 		// Check for correct data input
@@ -117,8 +117,8 @@ func (p *UpbitBinancePair) Run(ctx context.Context) {
 }
 
 func (p *UpbitBinancePair) Status() (bool, string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	if p.KimchiPrice == 0 || p.AnchorPrice == 0 || p.CefiPrice == 0 {
 		return false, "Waiting for data..."
 	}
@@ -129,14 +129,14 @@ func (p *UpbitBinancePair) Status() (bool, string) {
 }
 
 func (p *UpbitBinancePair) CheckEnter(enter float64) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	return p.EnterPremium < enter
 }
 
 func (p *UpbitBinancePair) CreatePremiumLongOrders(longFund, shortFund float64) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 
 	// Calculate the maximum amount
 	// Long and Short should equal in fund - to gurantee perfect delta hedge
@@ -171,8 +171,8 @@ func (p *UpbitBinancePair) CreatePremiumLongOrders(longFund, shortFund float64) 
 }
 
 func (p *UpbitBinancePair) CreatePremiumShortOrders(symbol string) (upbitrest.OrderSheet, binancerest.OrderSheet, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 
 	upbitOrderSheet := upbitrest.OrderSheet{}
 	binanceOrderSheet := binancerest.OrderSheet{}
@@ -180,14 +180,14 @@ func (p *UpbitBinancePair) CreatePremiumShortOrders(symbol string) (upbitrest.Or
 }
 
 func (p *UpbitBinancePair) CheckExit(exit float64) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	return p.ExitPremium > exit
 }
 
 func (p *UpbitBinancePair) ToPremiumLog() database.PremiumLog {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	return database.PremiumLog{
 		Timestamp:     time.Now(),
 		Symbol:        p.KimchiAsset.Symbol,
@@ -235,7 +235,7 @@ func (p *UpbitBinancePair) calculatePremiumExitPos() {
 }
 
 func (p *UpbitBinancePair) GetPremium() float64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	return p.Premium
 }

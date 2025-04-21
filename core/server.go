@@ -121,6 +121,9 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 		switch order.PairOrder.PairOrderType {
 		case pb.PairOrderType_PairOrderEnter: // Enter Upbit Long and Binance Short
 			// Calculate the amount of the order for upbit and binance
+			fmt.Println("upbitOrder: ", order.PairOrder.UpbitOrder)
+			fmt.Println("binanceOrder: ", order.PairOrder.BinanceOrder)
+
 			upbitAmount, binanceAmount, err := s.calculateOrderAmount(
 				order.PairOrder.UpbitOrder,
 				order.PairOrder.BinanceOrder,
@@ -243,6 +246,10 @@ func (s *Server) calculateOrderAmount(
 		math.Min(binanceBookAvailable, binanceFund),
 	)
 
+	if maxNotional <= 0 {
+		return 0, 0, fmt.Errorf("max notional is less than 0: %f", maxNotional)
+	}
+
 	rawBinanceQty := maxNotional / binanceOrder.Price    // Step 2: Convert to raw Binance quantity (before rounding)
 	stepSize := math.Pow(10, -float64(binancePrecision)) // Step 3: Round down Binance quantity using step size
 	roundedBinanceQty := math.Floor(rawBinanceQty/stepSize) * stepSize
@@ -257,14 +264,6 @@ func (s *Server) calculateOrderAmount(
 	if roundedBinanceQty < binanceMinNotional {
 		return 0, 0, fmt.Errorf("binance notional is less than minimum notional: %f", roundedBinanceQty)
 	}
-
-	log.Printf("upbitBookAvailable: %f, upbitFund: %f", upbitBookAvailable, upbitFund)
-	log.Printf("binanceBookAvailable: %f, binanceFund: %f", binanceBookAvailable, binanceFund)
-	log.Printf("maxNotional: %f", maxNotional)
-	log.Printf("rawBinanceQty: %f, stepSize: %f", rawBinanceQty, stepSize)
-	log.Printf("roundedBinanceQty: %f", roundedBinanceQty)
-	log.Printf("actualBinanceNotional: %f", actualBinanceNotional)
-	log.Printf("upbitNotional: %f", upbitNotional)
 
 	return upbitNotional, roundedBinanceQty, nil
 }

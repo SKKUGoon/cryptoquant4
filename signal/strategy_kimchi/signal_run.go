@@ -110,6 +110,7 @@ func (e *SignalContext) Run() {
 
 				switch true {
 				case e.inPosition && exitPremium > e.ExitPremiumBoundary:
+					e.UpbitBinancePairs.Mu.Lock()
 					log.Printf("Exiting position: %v (standard: %v)", exitPremium, e.ExitPremiumBoundary)
 
 					// TODO: Send Exit Position order signal with protobuf
@@ -122,12 +123,14 @@ func (e *SignalContext) Run() {
 								UpbitOrder: &traderpb.ExchangeOrder{
 									Symbol: e.UpbitAssetSymbol,
 									Side:   "sell",
-									Amount: 1,
+									Price:  e.UpbitBinancePairs.KimchiBestBid,
+									Amount: e.UpbitBinancePairs.KimchiBestBidQty,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
 									Symbol: e.BinanceAssetSymbol,
 									Side:   "buy",
-									Amount: 1,
+									Price:  e.UpbitBinancePairs.CefiBestAsk,
+									Amount: e.UpbitBinancePairs.CefiBestAskQty,
 								},
 							},
 						},
@@ -137,8 +140,10 @@ func (e *SignalContext) Run() {
 					} else {
 						e.ChangePositionStatus()
 					}
+					e.UpbitBinancePairs.Mu.Unlock()
 
 				case !e.inPosition && enterPremium < e.EnterPremiumBoundary:
+					e.UpbitBinancePairs.Mu.Lock()
 					log.Printf("Entering position: %v (standard: %v)", enterPremium, e.EnterPremiumBoundary)
 
 					_, err := e.traderMessenger.SubmitTrade(&traderpb.TradeRequest{
@@ -150,21 +155,26 @@ func (e *SignalContext) Run() {
 								UpbitOrder: &traderpb.ExchangeOrder{
 									Symbol: e.UpbitAssetSymbol,
 									Side:   "buy",
-									Amount: 1,
+									Price:  e.UpbitBinancePairs.KimchiBestAsk,
+									Amount: e.UpbitBinancePairs.KimchiBestAskQty,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
 									Symbol: e.BinanceAssetSymbol,
 									Side:   "sell",
-									Amount: 1,
+									Price:  e.UpbitBinancePairs.CefiBestBid,
+									Amount: e.UpbitBinancePairs.CefiBestBidQty,
 								},
 							},
 						},
 					})
+
 					if err != nil {
 						log.Printf("Failed to submit trade: %v", err)
 					} else {
 						e.ChangePositionStatus()
 					}
+
+					e.UpbitBinancePairs.Mu.Unlock()
 				}
 			case <-ticker.C:
 				select {

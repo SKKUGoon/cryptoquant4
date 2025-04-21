@@ -87,7 +87,7 @@ services:
     container_name: cryptoquant_xrp
     labels:
       engine: xrp
-      type: trader
+      type: signal
     env_file:
       - env/.env.signal
     environment:
@@ -102,7 +102,7 @@ services:
     container_name: cryptoquant_move
     labels:
       engine: move
-      type: trader
+      type: signal
     env_file:
       - env/.env.signal
     environment:
@@ -117,13 +117,28 @@ services:
     container_name: cryptoquant_cow
     labels:
       engine: cow
-      type: trader
+      type: signal
     env_file:
       - env/.env.signal
     environment:
       - ENGINE_NAME=cow
       - BINANCE_SYMBOL=COWUSDT
       - UPBIT_SYMBOL=KRW-COW
+      - ANCHOR_SYMBOL=KRW-USDT
+      - TRADER_ADDRESS=trader:50051
+
+  eth:
+    <<: *base-engine
+    container_name: cryptoquant_eth
+    labels:
+      engine: eth
+      type: signal
+    env_file:
+      - env/.env.signal
+    environment:
+      - ENGINE_NAME=eth
+      - BINANCE_SYMBOL=ETHUSDT
+      - UPBIT_SYMBOL=KRW-ETH
       - ANCHOR_SYMBOL=KRW-USDT
       - TRADER_ADDRESS=trader:50051
 
