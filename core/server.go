@@ -131,6 +131,7 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 			if err != nil {
 				return nil, err
 			}
+			log.Printf("upbitAmount: %f, binanceAmount: %f", upbitAmount, binanceAmount)
 
 			// Generate upbit order sheet (buy) + binance order sheet (sell)
 			if upbitOrderSheet = generateUpbitBuyOrderSheet(order.PairOrder.UpbitOrder, upbitAmount); upbitOrderSheet == nil {
