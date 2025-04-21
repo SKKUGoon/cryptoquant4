@@ -221,6 +221,7 @@ func (s *Server) calculateOrderAmount(
 	upbitPrincipalCurrency, binancePrincipalCurrency string,
 	exchangeRate float64, // KRW for USDT. e.g.) 1400KRW for 1USDT
 ) (float64, float64, error) { // upbitAmount, binanceAmount, error
+
 	// Necessary information
 	upbitWallet := s.Account.GetUpbitWalletSnapshot()
 	binanceWallet := s.Account.GetBinanceWalletSnapshot()
@@ -256,6 +257,14 @@ func (s *Server) calculateOrderAmount(
 	if roundedBinanceQty < binanceMinNotional {
 		return 0, 0, fmt.Errorf("binance notional is less than minimum notional: %f", roundedBinanceQty)
 	}
+
+	log.Printf("upbitBookAvailable: %f, upbitFund: %f", upbitBookAvailable, upbitFund)
+	log.Printf("binanceBookAvailable: %f, binanceFund: %f", binanceBookAvailable, binanceFund)
+	log.Printf("maxNotional: %f", maxNotional)
+	log.Printf("rawBinanceQty: %f, stepSize: %f", rawBinanceQty, stepSize)
+	log.Printf("roundedBinanceQty: %f", roundedBinanceQty)
+	log.Printf("actualBinanceNotional: %f", actualBinanceNotional)
+	log.Printf("upbitNotional: %f", upbitNotional)
 
 	return upbitNotional, roundedBinanceQty, nil
 }
