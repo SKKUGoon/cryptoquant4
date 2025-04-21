@@ -81,6 +81,7 @@ func main() {
 	engine.ConfirmTradeParameters()
 
 	if oku && okb {
+		log.Println("Account already in position")
 		engine.ChangePositionStatus() // Set to inPosition
 	} else if oku && !okb || !oku && okb {
 		panic("Account in inconsistent state")
