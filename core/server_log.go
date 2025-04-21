@@ -20,7 +20,7 @@ func (s *Server) StartKimchiTradeLog() {
 			case <-s.ctx.Done():
 				return
 			case row := <-s.kimchiTradeLog:
-				s.Database.InsertStrategyKimchiOrderLog([]database.KimchiOrderLog{row})
+				s.Database.InsertStrategyKimchiOrderLog(row)
 			}
 		}
 	}()

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -43,7 +44,7 @@ func (s *Server) KimchiPremiumEject() {
 		if asset == "KRW" {
 			continue
 		}
-		if amount > 0 {
+		if amount > 0 && amount > float64(s.UpbitPrecision.MinimumTradeAmount) {
 			log.Printf("Closing position: %s %f", asset, amount)
 
 			orderSheet := upbitrest.OrderSheet{
@@ -53,9 +54,14 @@ func (s *Server) KimchiPremiumEject() {
 				OrdType: "market",
 			}
 
-			_, err := s.UpbitTrader.SendOrder(orderSheet)
+			resp, err := s.UpbitTrader.SendOrder(orderSheet)
 			if err != nil {
-				log.Printf("Failed to send close %v: %v", asset, err)
+				log.Printf("Failed to send close %v: %v (%v)", asset, err, resp.Error)
+				walletCleared = false
+				note = append(note, fmt.Sprintf("Failed to send close %v: %v", asset, err))
+			}
+			if resp != nil && resp.Error != nil {
+				log.Printf("Failed to send close %v: %v (%v)", asset, err, resp.Error)
 				walletCleared = false
 				note = append(note, fmt.Sprintf("Failed to send close %v: %v", asset, err))
 			}
@@ -67,22 +73,32 @@ func (s *Server) KimchiPremiumEject() {
 		if asset == "USDT" {
 			continue
 		}
-		if amount > 0 {
+		amount = math.Abs(amount) // NOTE: Binance amount is negative (Short)
+
+		if amount > 0 && amount > float64(s.BinancePrecision.MinimumTradeAmount) {
 			log.Printf("Closing position: %s %f", asset, amount)
+			binancePrecision := s.BinancePrecision.GetSymbolQuantityPrecision(asset)
+			stepSize := math.Pow(10, -float64(binancePrecision))
+			amount = math.Floor((amount*1.0005)/stepSize) * stepSize // Round down to precision with 0.05% buffer
 
 			orderSheet := &binancerest.OrderSheet{
 				Symbol:     asset,
 				Side:       "BUY",
 				ReduceOnly: "true",
 				Type:       "MARKET",
-				Quantity:   decimal.NewFromFloat(amount * 1.0005), // Buffer of 0.05% ensure all position closed (Reduce only)
+				Quantity:   decimal.NewFromFloat(amount), // Buffer of 0.05% ensure all position closed (Reduce only)
 			}
 
-			_, err := s.BinanceTrader.SendSingleOrder(orderSheet)
+			resp, err := s.BinanceTrader.SendSingleOrder(orderSheet)
 			if err != nil {
 				log.Printf("Failed to send close %v: %v", asset, err)
 				walletCleared = false
 				note = append(note, fmt.Sprintf("Failed to send close %v: %v", asset, err))
+			}
+			if resp != nil && resp.Error != nil {
+				log.Printf("Failed to send close %v: %v", asset, resp.Error)
+				walletCleared = false
+				note = append(note, fmt.Sprintf("Failed to send close %v: %v", asset, resp.Error))
 			}
 		}
 	}

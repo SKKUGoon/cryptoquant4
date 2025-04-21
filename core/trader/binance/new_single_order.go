@@ -10,7 +10,7 @@ import (
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 )
 
-func (t *Trader) SendSingleOrder(orderSheet *binancerest.OrderSheet) (binancerest.OrderResult, error) {
+func (t *Trader) SendSingleOrder(orderSheet *binancerest.OrderSheet) (*binancerest.OrderResult, error) {
 	const weight = 5
 	const urlBase = "https://fapi.binance.com/fapi/v1/order"
 	t.checkRateLimit(weight)
@@ -18,14 +18,14 @@ func (t *Trader) SendSingleOrder(orderSheet *binancerest.OrderSheet) (binanceres
 	// Make query + signature
 	queryString, signature, err := t.GenerateSignature(orderSheet)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 	fullQuery := queryString + "&signature=" + signature
 
 	// Send request
 	req, err := http.NewRequest("POST", urlBase, strings.NewReader(fullQuery))
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
 	req.Header.Set("X-MBX-APIKEY", t.pubkey)
@@ -34,24 +34,24 @@ func (t *Trader) SendSingleOrder(orderSheet *binancerest.OrderSheet) (binanceres
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
 	var result binancerest.OrderResult
 	if err := json.Unmarshal(body, &result); err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
 
-func (t *Trader) SendSingleOrderTestServer(orderSheet *binancerest.OrderSheet) (binancerest.OrderResult, error) {
+func (t *Trader) SendSingleOrderTestServer(orderSheet *binancerest.OrderSheet) (*binancerest.OrderResult, error) {
 	const weight = 5
 	const urlBase = "https://testnet.binancefuture.com/fapi/v1/order"
 	t.checkRateLimit(weight)
@@ -59,14 +59,14 @@ func (t *Trader) SendSingleOrderTestServer(orderSheet *binancerest.OrderSheet) (
 	// Make query + signature
 	queryString, signature, err := t.GenerateSignature(orderSheet)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 	fullQuery := queryString + "&signature=" + signature
 
 	// Send request
 	req, err := http.NewRequest("POST", urlBase, strings.NewReader(fullQuery))
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
 	req.Header.Set("X-MBX-APIKEY", t.pubkey)
@@ -75,19 +75,19 @@ func (t *Trader) SendSingleOrderTestServer(orderSheet *binancerest.OrderSheet) (
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
 	var result binancerest.OrderResult
 	if err := json.Unmarshal(body, &result); err != nil {
-		return binancerest.OrderResult{}, err
+		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }

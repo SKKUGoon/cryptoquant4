@@ -10,7 +10,7 @@ import (
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
 )
 
-func (t *Trader) SendOrder(orderSheet upbitrest.OrderSheet) (upbitrest.OrderResult, error) {
+func (t *Trader) SendOrder(orderSheet upbitrest.OrderSheet) (*upbitrest.OrderResult, error) {
 	const weight = 5
 	const urlBase = "https://api.upbit.com/v1/orders"
 	t.checkRateLimit(weight)
@@ -18,13 +18,13 @@ func (t *Trader) SendOrder(orderSheet upbitrest.OrderSheet) (upbitrest.OrderResu
 	// Make byteQuery + signature
 	byteQuery, authToken, err := t.GetSignature(orderSheet)
 	if err != nil {
-		return upbitrest.OrderResult{}, err
+		return nil, err
 	}
 
 	// Convert orderSheet to JSON and send as request body
 	req, err := http.NewRequest("POST", urlBase, bytes.NewReader(byteQuery))
 	if err != nil {
-		return upbitrest.OrderResult{}, err
+		return nil, err
 	}
 
 	// Add Authorization header
@@ -35,21 +35,21 @@ func (t *Trader) SendOrder(orderSheet upbitrest.OrderSheet) (upbitrest.OrderResu
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return upbitrest.OrderResult{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return upbitrest.OrderResult{}, err
+		return nil, err
 	}
 
 	// Parse response body
 	var result upbitrest.OrderResult
 	if err := json.Unmarshal(body, &result); err != nil {
-		return upbitrest.OrderResult{}, err
+		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
