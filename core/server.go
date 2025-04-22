@@ -21,7 +21,7 @@ import (
 )
 
 const SAFE_MARGIN = 0.9
-const USE_FUND_UPPER_BOUND = 0.5 // 80% of the fund is used
+const USE_FUND_UPPER_BOUND = 0.4 // 80% of the fund is used
 
 // Trader gRPC server
 type Server struct {
