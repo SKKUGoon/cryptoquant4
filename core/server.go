@@ -307,7 +307,7 @@ func generateUpbitSellOrderSheet(order *pb.ExchangeOrder, upbitAmount float64) *
 }
 
 func generateBinanceBuyOrderSheet(order *pb.ExchangeOrder, binanceAmount float64) (*binancerest.OrderSheet, error) {
-	safeDecimal, err := utils.SafeDecimalFromFloat(binanceAmount * 1.0005)
+	safeDecimal, err := utils.SafeDecimalFromFloat(binanceAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func generateBinanceBuyOrderSheet(order *pb.ExchangeOrder, binanceAmount float64
 	return &binancerest.OrderSheet{
 		Symbol:     order.Symbol,
 		Side:       "BUY",
-		Quantity:   safeDecimal, // NOTE: Buffer of 0.05% ensure all position closed (Reduce only)
+		Quantity:   safeDecimal,
 		ReduceOnly: "true",
 		Type:       "MARKET",
 		Timestamp:  time.Now().UnixMilli(),
