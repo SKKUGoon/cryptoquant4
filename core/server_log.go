@@ -42,15 +42,17 @@ func (s *Server) StartWalletLog() {
 
 func (s *Server) CreateKimchiOrderLog(
 	isPairEnter bool,
-	upbitOrder *pb.ExchangeOrder,
-	binanceOrder *pb.ExchangeOrder,
-	anchorPrice float64,
+	pairOrder *pb.PairOrderSheet,
 	upbitResp *upbitrest.OrderResult,
 	binanceResp *binancerest.OrderResult,
 	orderTime, executionTime time.Time,
 ) ([]database.KimchiOrderLog, error) {
 	var pairSide string
 	var uuid = uuid.New().String()
+
+	upbitOrder := pairOrder.UpbitOrder
+	binanceOrder := pairOrder.BinanceOrder
+	anchorPrice := pairOrder.ExchangeRate
 
 	if isPairEnter {
 		pairSide = "long"
@@ -68,6 +70,7 @@ func (s *Server) CreateKimchiOrderLog(
 		PairID:        uuid,
 		OrderTime:     orderTime,
 		ExecutionTime: executionTime,
+		Symbol:        upbitOrder.Symbol,
 		PairSide:      pairSide,
 		Exchange:      "upbit",
 		Side:          upbitOrder.Side,
@@ -79,6 +82,7 @@ func (s *Server) CreateKimchiOrderLog(
 		PairID:        uuid,
 		OrderTime:     orderTime,
 		ExecutionTime: executionTime,
+		Symbol:        upbitOrder.Symbol, // Unify symbol
 		PairSide:      pairSide,
 		Exchange:      "binance",
 		Side:          binanceOrder.Side,

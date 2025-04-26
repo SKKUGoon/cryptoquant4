@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -151,14 +152,14 @@ func (a *AccountSource) Sync() error {
 	if err := a.SyncWalletSnapshotBinance(); err != nil {
 		return fmt.Errorf("failed to sync Binance wallet snapshot: %v", err)
 	}
-
-	// // Position sync
-	// if err := a.SyncPositionUpbit(); err != nil {
-	// 	return fmt.Errorf("failed to sync Upbit position: %v", err)
-	// }
-	// if err := a.SyncPositionBinance(); err != nil {
-	// 	return fmt.Errorf("failed to sync Binance position: %v", err)
-	// }
-
 	return nil
+}
+
+func (a *AccountSource) Run() {
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		for range ticker.C {
+			a.UpdateRedis()
+		}
+	}()
 }

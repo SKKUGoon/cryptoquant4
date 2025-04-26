@@ -18,6 +18,7 @@ type KimchiOrderLog struct {
 	PairID        string
 	OrderTime     time.Time
 	ExecutionTime time.Time
+	Symbol        string
 	PairSide      string
 	Exchange      string
 	Side          string

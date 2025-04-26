@@ -44,7 +44,7 @@ func (s *Server) KimchiPremiumEject() {
 		if asset == "KRW" {
 			continue
 		}
-		if amount > 0 && amount > float64(s.UpbitPrecision.MinimumTradeAmount) {
+		if amount > 0 && amount > float64(s.UpbitConfig.MinimumTradeAmount) {
 			log.Printf("Closing position: %s %f", asset, amount)
 
 			orderSheet := upbitrest.OrderSheet{
@@ -75,9 +75,9 @@ func (s *Server) KimchiPremiumEject() {
 		}
 		amount = math.Abs(amount) // NOTE: Binance amount is negative (Short)
 
-		if amount > 0 && amount > float64(s.BinancePrecision.MinimumTradeAmount) {
+		if amount > 0 && amount > float64(s.BinanceConfig.MinimumTradeAmount) {
 			log.Printf("Closing position: %s %f", asset, amount)
-			binancePrecision := s.BinancePrecision.GetSymbolQuantityPrecision(asset)
+			binancePrecision := s.BinanceConfig.GetSymbolQuantityPrecision(asset)
 			stepSize := math.Pow(10, -float64(binancePrecision))
 			amount = math.Floor((amount*1.0005)/stepSize) * stepSize // Round down to precision with 0.05% buffer
 
