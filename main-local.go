@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	sig "cryptoquant.com/m/signal/strategy_kimchi"
+	s01Sig "cryptoquant.com/m/signal/s01"
 	"github.com/joho/godotenv"
 )
 
@@ -40,7 +40,7 @@ func main() {
 	defer cancel()
 
 	// Initialize engine with development settings
-	engine := sig.New(ctx)
+	engine := s01Sig.New(ctx)
 	engine.ConfirmTargetSymbols()
 	engine.ConfirmTradeParameters()
 

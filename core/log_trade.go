@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Server) StartKimchiTradeLog() {
+func (s *Operation) StartKimchiTradeLog() {
 	log.Println("Starting Kimchi trade log")
 	go func() {
 		for {
@@ -26,7 +26,7 @@ func (s *Server) StartKimchiTradeLog() {
 	}()
 }
 
-func (s *Server) StartWalletLog() {
+func (s *Operation) StartWalletLog() {
 	log.Println("Starting wallet log")
 	go func() {
 		for {
@@ -40,7 +40,7 @@ func (s *Server) StartWalletLog() {
 	}()
 }
 
-func (s *Server) CreateKimchiOrderLog(
+func (s *Operation) CreateKimchiOrderLog(
 	isPairEnter bool,
 	pairOrder *pb.PairOrderSheet,
 	upbitResp *upbitrest.OrderResult,

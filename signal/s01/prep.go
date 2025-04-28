@@ -1,4 +1,4 @@
-package signalkimchi
+package s01signal
 
 import (
 	"fmt"

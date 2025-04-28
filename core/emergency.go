@@ -18,7 +18,7 @@ import (
 // 2. Close all positions
 // 3. Log the emergency
 
-func (s *Server) KimchiPremiumEject() {
+func (s *Operation) KimchiPremiumEject() {
 	s.Account.Mu.Lock()
 	defer s.Account.Mu.Unlock()
 

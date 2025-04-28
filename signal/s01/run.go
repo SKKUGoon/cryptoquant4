@@ -1,4 +1,4 @@
-package signalkimchi
+package s01signal
 
 import (
 	"log"
@@ -7,7 +7,8 @@ import (
 	traderpb "cryptoquant.com/m/gen/traderpb"
 	binancews "cryptoquant.com/m/internal/binance/ws"
 	upbitws "cryptoquant.com/m/internal/upbit/ws"
-	kimchiarbv1 "cryptoquant.com/m/strategy/arbitrage/kimchi_v1"
+	strategybase "cryptoquant.com/m/strategy/base"
+	s01 "cryptoquant.com/m/strategy/s01"
 	binancemarket "cryptoquant.com/m/streams/binance/market"
 	upbitmarket "cryptoquant.com/m/streams/upbit/market"
 )
@@ -19,9 +20,9 @@ import (
 // 3. AnchorAsset: Represents the anchor trading pair
 func (e *SignalContext) StartAssetPair() {
 	log.Printf("Starting asset for %v", e.UpbitAssetSymbol)
-	kimchiAsset := kimchiarbv1.NewAsset(e.UpbitAssetSymbol)
-	forexAsset := kimchiarbv1.NewAsset(e.BinanceAssetSymbol)
-	anchorAsset := kimchiarbv1.NewAsset(e.AnchorAssetSymbol)
+	kimchiAsset := strategybase.NewAsset(e.UpbitAssetSymbol)
+	forexAsset := strategybase.NewAsset(e.BinanceAssetSymbol)
+	anchorAsset := strategybase.NewAsset(e.AnchorAssetSymbol)
 
 	kimchiAsset.SetPriceChannel(e.upbitTradeChan)
 	forexAsset.SetPriceChannel(e.binanceTradeChan)
@@ -43,11 +44,11 @@ func (e *SignalContext) StartAssetPair() {
 	forexAsset.SetBestAskQtyChannel(e.binanceBestAskQtyChan)
 	anchorAsset.SetBestAskQtyChannel(e.anchorBestAskQtyChan)
 
-	e.UpbitBinancePairs = &kimchiarbv1.UpbitBinancePair{
-		AnchorAsset: anchorAsset,
-		CefiAsset:   forexAsset,
-		KimchiAsset: kimchiAsset,
-		PremiumChan: e.premiumChan,
+	e.UpbitBinancePairs = &s01.UpbitBinancePair{
+		AnchorAsset:  anchorAsset,
+		BinanceAsset: forexAsset,
+		UpbitAsset:   kimchiAsset,
+		PremiumChan:  e.premiumChan,
 	}
 
 	log.Printf("Asset Pairs(%v, %v, %v) initialized", e.UpbitAssetSymbol, e.BinanceAssetSymbol, e.AnchorAssetSymbol)
@@ -123,14 +124,14 @@ func (e *SignalContext) Run() {
 								UpbitOrder: &traderpb.ExchangeOrder{
 									Symbol: e.UpbitAssetSymbol,
 									Side:   "sell",
-									Price:  e.UpbitBinancePairs.KimchiBestBid,
-									Amount: e.UpbitBinancePairs.KimchiBestBidQty,
+									Price:  e.UpbitBinancePairs.UpbitBestBid,
+									Amount: e.UpbitBinancePairs.UpbitBestBidQty,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
 									Symbol: e.BinanceAssetSymbol,
 									Side:   "buy",
-									Price:  e.UpbitBinancePairs.CefiBestAsk,
-									Amount: e.UpbitBinancePairs.CefiBestAskQty,
+									Price:  e.UpbitBinancePairs.BinanceBestAsk,
+									Amount: e.UpbitBinancePairs.BinanceBestAskQty,
 								},
 							},
 						},
@@ -155,14 +156,14 @@ func (e *SignalContext) Run() {
 								UpbitOrder: &traderpb.ExchangeOrder{
 									Symbol: e.UpbitAssetSymbol,
 									Side:   "buy",
-									Price:  e.UpbitBinancePairs.KimchiBestAsk,
-									Amount: e.UpbitBinancePairs.KimchiBestAskQty,
+									Price:  e.UpbitBinancePairs.UpbitBestAsk,
+									Amount: e.UpbitBinancePairs.UpbitBestAskQty,
 								},
 								BinanceOrder: &traderpb.ExchangeOrder{
 									Symbol: e.BinanceAssetSymbol,
 									Side:   "sell",
-									Price:  e.UpbitBinancePairs.CefiBestBid,
-									Amount: e.UpbitBinancePairs.CefiBestBidQty,
+									Price:  e.UpbitBinancePairs.BinanceBestBid,
+									Amount: e.UpbitBinancePairs.BinanceBestBidQty,
 								},
 							},
 						},

@@ -17,7 +17,7 @@ import (
 	binancetrade "cryptoquant.com/m/core/trader/binance"
 	database "cryptoquant.com/m/data/database"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
-	sig "cryptoquant.com/m/signal/strategy_kimchi"
+	s01 "cryptoquant.com/m/signal/strategy_kimchi"
 )
 
 func init() {
@@ -76,7 +76,7 @@ func main() {
 	_, okb := binanceWallet[csymbol]
 
 	// Initialize engine with production settings
-	engine := sig.New(ctx)
+	engine := s01.New(ctx)
 	engine.ConfirmTargetSymbols()
 	engine.ConfirmTradeParameters()
 

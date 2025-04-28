@@ -1,4 +1,4 @@
-package signalkimchi
+package s01signal
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	config "cryptoquant.com/m/config"
 	database "cryptoquant.com/m/data/database"
 	signal "cryptoquant.com/m/signal"
-	kimchiarbv1 "cryptoquant.com/m/strategy/arbitrage/kimchi_v1"
+	s01 "cryptoquant.com/m/strategy/s01"
 )
 
 // SignalContext represents the core trading engine context that manages configurations
@@ -35,7 +35,7 @@ type SignalContext struct {
 	TimeScale *database.TimeScale // Log premium data
 
 	// Strategy
-	UpbitBinancePairs    *kimchiarbv1.UpbitBinancePair
+	UpbitBinancePairs    *s01.UpbitBinancePair
 	EnterPremiumBoundary float64
 	ExitPremiumBoundary  float64
 

@@ -9,11 +9,6 @@ import (
 	"strings"
 	"time"
 
-	config "cryptoquant.com/m/config"
-	account "cryptoquant.com/m/core/account"
-	binancetrade "cryptoquant.com/m/core/trader/binance"
-	upbittrade "cryptoquant.com/m/core/trader/upbit"
-	database "cryptoquant.com/m/data/database"
 	pb "cryptoquant.com/m/gen/traderpb"
 	binancerest "cryptoquant.com/m/internal/binance/rest"
 	upbitrest "cryptoquant.com/m/internal/upbit/rest"
@@ -21,95 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const SAFE_MARGIN = 0.9
-const USE_FUND_UPPER_BOUND = 0.4
-
-// Trader gRPC server
-type Server struct {
-	pb.UnimplementedTraderServer
-
-	ctx context.Context
-
-	// Unified Account Manager
-	Account *account.AccountSource
-
-	// Exchange configurations - Vet precision
-	UpbitConfig   *config.UpbitSpotTradeConfig
-	BinanceConfig *config.BinanceFutureTradeConfig
-
-	// Traders
-	UpbitTrader   *upbittrade.Trader
-	BinanceTrader *binancetrade.Trader
-
-	// Data
-	Database  *database.Database  // Get trade parameters
-	TimeScale *database.TimeScale // Log premium data
-
-	// Logging channel
-	kimchiTradeLog chan []database.KimchiOrderLog
-	walletLog      chan database.AccountSnapshot
-}
-
-func NewTraderServer(ctx context.Context) (*Server, error) {
-	as := account.NewAccountSource(ctx)
-	err := as.Sync()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create exchange configs
-	upbitConfig, err := config.NewUpbitSpotTradeConfig()
-	if err != nil {
-		log.Printf("Failed to create Upbit config: %v", err)
-		panic(err)
-	}
-	binanceConfig, err := config.NewBinanceFutureTradeConfig()
-	if err != nil {
-		log.Printf("Failed to create Binance config: %v", err)
-		panic(err)
-	}
-
-	// Connect to database
-	db, err := database.ConnectDB()
-	if err != nil {
-		log.Printf("Failed to connect to database: %v", err)
-		panic(err)
-	}
-	ts, err := database.ConnectTS()
-	if err != nil {
-		log.Printf("Failed to connect to TimeScale: %v", err)
-		panic(err)
-	}
-
-	// Create trader
-	upbitTrader := upbittrade.NewTrader()
-	upbitTrader.UpdateRateLimit(1000)
-	binanceTrader := binancetrade.NewTrader()
-	binanceTrader.UpdateRateLimit(1000)
-
-	return &Server{
-		ctx:     ctx,
-		Account: as,
-
-		// Configurations
-		UpbitConfig:   upbitConfig,
-		BinanceConfig: binanceConfig,
-
-		// Traders
-		UpbitTrader:   upbitTrader,
-		BinanceTrader: binanceTrader,
-
-		// Utility
-		Database:  db,
-		TimeScale: ts,
-
-		// Logging channels
-		kimchiTradeLog: make(chan []database.KimchiOrderLog, 100),
-		walletLog:      make(chan database.AccountSnapshot, 100),
-	}, nil
-}
-
-func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
+func (s *Operation) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.OrderResponse, error) {
 	var isPairEnter bool
 	var upbitOrderSheet *upbitrest.OrderSheet
 	var binanceOrderSheet *binancerest.OrderSheet
@@ -232,7 +139,7 @@ func (s *Server) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.Ord
 // calculateOrderAmount calculates the amount of the order for upbit and binance
 // based on the order and wallet information.
 // It returns the amount of the order for upbit and binance, and an error if there is one.
-func (s *Server) calculateOrderAmount(
+func (s *Operation) calculateOrderAmount(
 	upbitOrder, binanceOrder *pb.ExchangeOrder,
 	exchangeRate float64, // KRW for USDT. e.g.) 1400KRW for 1USDT
 ) (float64, decimal.Decimal, error) { // upbitAmount, binanceAmount, error

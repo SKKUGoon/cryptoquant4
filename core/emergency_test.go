@@ -16,7 +16,7 @@ func TestKimchiPremiumEject(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	server, err := core.NewTraderServer(ctx)
+	server, err := core.NewOperation(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create trader server: %v", err)
 	}

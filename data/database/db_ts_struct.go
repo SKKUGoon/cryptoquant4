@@ -3,15 +3,19 @@ package database
 import "time"
 
 type PremiumLog struct {
-	Timestamp   time.Time
-	Symbol      string
-	AnchorPrice float64
-	CefiPrice   float64
+	Timestamp       time.Time
+	Symbol          string
+	ExchangeBase    string // Binance, OKX etc
+	ExchangePremium string // Upbit, Bithumb etc
+
 	// Best Bid and Ask
 	KimchiBestBid float64
 	KimchiBestAsk float64
 	CefiBestBid   float64
 	CefiBestAsk   float64
+
+	// Anchor Price (USDT)
+	AnchorPrice float64
 }
 
 type KimchiOrderLog struct {
