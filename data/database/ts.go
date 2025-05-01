@@ -35,52 +35,52 @@ func (t *TimeScale) Close() error {
 	return t.db.Close()
 }
 
-func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
-	if len(logs) == 0 {
-		return nil
-	}
+// func (t *TimeScale) InsertPremiumLog(logs []PremiumLog) error {
+// 	if len(logs) == 0 {
+// 		return nil
+// 	}
 
-	// Start a transaction
-	tx, err := t.db.Begin()
-	if err != nil {
-		return fmt.Errorf("error starting transaction: %v", err)
-	}
+// 	// Start a transaction
+// 	tx, err := t.db.Begin()
+// 	if err != nil {
+// 		return fmt.Errorf("error starting transaction: %v", err)
+// 	}
 
-	// Prepare the statement
-	stmt, err := tx.Prepare(`
-		INSERT INTO cryptoquant.premium_logs (time, symbol, anchor_price, kimchi_best_bid, kimchi_best_ask, cefi_best_bid, cefi_best_ask)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error preparing statement: %v", err)
-	}
-	defer stmt.Close()
+// 	// Prepare the statement
+// 	stmt, err := tx.Prepare(`
+// 		INSERT INTO cryptoquant.premium_logs (time, symbol, anchor_price, kimchi_best_bid, kimchi_best_ask, cefi_best_bid, cefi_best_ask)
+// 		VALUES ($1, $2, $3, $4, $5, $6, $7)
+// 	`)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		return fmt.Errorf("error preparing statement: %v", err)
+// 	}
+// 	defer stmt.Close()
 
-	// Execute the statement for each log
-	for _, log := range logs {
-		_, err := stmt.Exec(
-			log.Timestamp,
-			log.Symbol,
-			log.AnchorPrice,
-			log.KimchiBestBid,
-			log.KimchiBestAsk,
-			log.CefiBestBid,
-			log.CefiBestAsk,
-		)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("error executing statement: %v", err)
-		}
-	}
+// 	// Execute the statement for each log
+// 	for _, log := range logs {
+// 		_, err := stmt.Exec(
+// 			log.Timestamp,
+// 			log.Symbol,
+// 			log.AnchorPrice,
+// 			log.KimchiBestBid,
+// 			log.KimchiBestAsk,
+// 			log.CefiBestBid,
+// 			log.CefiBestAsk,
+// 		)
+// 		if err != nil {
+// 			tx.Rollback()
+// 			return fmt.Errorf("error executing statement: %v", err)
+// 		}
+// 	}
 
-	// Commit the transaction
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("error committing transaction: %v", err)
-	}
+// 	// Commit the transaction
+// 	if err := tx.Commit(); err != nil {
+// 		return fmt.Errorf("error committing transaction: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (t *TimeScale) InsertAccountSnapshot(logs []AccountSnapshot) error {
 	if len(logs) == 0 {

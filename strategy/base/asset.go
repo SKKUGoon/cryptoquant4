@@ -1,88 +1,79 @@
 package strategybase
 
-import "sync"
-
-type Asset struct {
-	Mu     sync.Mutex
-	Symbol string
-
-	PriceChan      chan float64
-	BestBidPrcChan chan float64
-	BestBidQtyChan chan float64
-	BestAskPrcChan chan float64
-	BestAskQtyChan chan float64
-}
-
-func NewAsset(symbol string) *Asset {
-	return &Asset{
-		Symbol: symbol,
-	}
-}
-
-func (a *Asset) SetPriceChannel(ch chan float64) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	a.PriceChan = ch
-}
-
-func (a *Asset) SetBestBidPrcChannel(ch chan float64) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	a.BestBidPrcChan = ch
-}
-
-func (a *Asset) SetBestBidQtyChannel(ch chan float64) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	a.BestBidQtyChan = ch
-}
-
-func (a *Asset) SetBestAskPrcChannel(ch chan float64) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	a.BestAskPrcChan = ch
-}
-
-func (a *Asset) SetBestAskQtyChannel(ch chan float64) {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	a.BestAskQtyChan = ch
-}
-
-func (a *Asset) Close() {
-	a.Mu.Lock()
-	defer a.Mu.Unlock()
-	close(a.PriceChan)
-	close(a.BestBidPrcChan)
-	close(a.BestBidQtyChan)
-	close(a.BestAskPrcChan)
-	close(a.BestAskQtyChan)
-}
+import (
+	"context"
+	"log"
+	"sync"
+)
 
 type SubscribableAsset struct {
 	Mu     sync.RWMutex
+	ctx    context.Context
 	Symbol string
 
-	bestBidPrcSubs []chan float64
-	bestBidQtySubs []chan float64
-	bestAskPrcSubs []chan float64
-	bestAskQtySubs []chan float64
+	// Streams
+	orderbookChan chan [2][2]float64 // [[best bid, best bid qty], [best ask, best ask qty]]
+	tradeChan     chan [2]float64
+
+	// Subscribers
+	BestBidPrcSubs map[string]chan float64
+	BestBidQtySubs map[string]chan float64
+
+	TradePrcSubs map[string]chan float64
+	TradeQtySubs map[string]chan float64
+
+	BestAskPrcSubs map[string]chan float64
+	BestAskQtySubs map[string]chan float64
 }
 
-func NewSubscribableAsset(symbol string) *SubscribableAsset {
+func NewSubscribableAsset(ctx context.Context, symbol string) *SubscribableAsset {
 	return &SubscribableAsset{
-		Symbol:         symbol,
-		bestBidPrcSubs: make([]chan float64, 0),
-		bestBidQtySubs: make([]chan float64, 0),
-		bestAskPrcSubs: make([]chan float64, 0),
-		bestAskQtySubs: make([]chan float64, 0),
+		ctx:    ctx,
+		Symbol: symbol,
+		// Streams
+		orderbookChan: make(chan [2][2]float64, 100), // 100 is the buffer size. More tolorance for bursts
+		tradeChan:     make(chan [2]float64, 100),
+		// Subscribers
+		BestBidPrcSubs: make(map[string]chan float64),
+		BestBidQtySubs: make(map[string]chan float64),
+		BestAskPrcSubs: make(map[string]chan float64),
+		BestAskQtySubs: make(map[string]chan float64),
+		TradePrcSubs:   make(map[string]chan float64),
+		TradeQtySubs:   make(map[string]chan float64),
 	}
 }
 
+func (a *SubscribableAsset) Check() {
+	log.Printf("\nSubscribers Table for %s:\n"+
+		"+-----------------+----------+\n"+
+		"| Channel         | Count    |\n"+
+		"+-----------------+----------+\n"+
+		"| BestBidPrc      | %8d |\n"+
+		"| BestBidQty      | %8d |\n"+
+		"| BestAskPrc      | %8d |\n"+
+		"| BestAskQty      | %8d |\n"+
+		"| TradePrc        | %8d |\n"+
+		"| TradeQty        | %8d |\n"+
+		"+-----------------+----------+",
+		a.Symbol,
+		len(a.BestBidPrcSubs),
+		len(a.BestBidQtySubs),
+		len(a.BestAskPrcSubs),
+		len(a.BestAskQtySubs),
+		len(a.TradePrcSubs),
+		len(a.TradeQtySubs))
+}
+
+func (a *SubscribableAsset) SetOrderbookChan(ch chan [2][2]float64) {
+	a.orderbookChan = ch
+}
+
+func (a *SubscribableAsset) SetTradeChan(ch chan [2]float64) {
+	a.tradeChan = ch
+}
+
 func (a *SubscribableAsset) UpdateBestBidPrc(prc float64) {
-	a.Mu.RLock()
-	defer a.Mu.RUnlock()
-	for _, ch := range a.bestBidPrcSubs {
+	for _, ch := range a.BestBidPrcSubs {
 		select {
 		case ch <- prc:
 		default:
@@ -92,9 +83,7 @@ func (a *SubscribableAsset) UpdateBestBidPrc(prc float64) {
 }
 
 func (a *SubscribableAsset) UpdateBestBidQty(qty float64) {
-	a.Mu.RLock()
-	defer a.Mu.RUnlock()
-	for _, ch := range a.bestBidQtySubs {
+	for _, ch := range a.BestBidQtySubs {
 		select {
 		case ch <- qty:
 		default:
@@ -104,9 +93,7 @@ func (a *SubscribableAsset) UpdateBestBidQty(qty float64) {
 }
 
 func (a *SubscribableAsset) UpdateBestAskPrc(prc float64) {
-	a.Mu.RLock()
-	defer a.Mu.RUnlock()
-	for _, ch := range a.bestAskPrcSubs {
+	for _, ch := range a.BestAskPrcSubs {
 		select {
 		case ch <- prc:
 		default:
@@ -116,13 +103,53 @@ func (a *SubscribableAsset) UpdateBestAskPrc(prc float64) {
 }
 
 func (a *SubscribableAsset) UpdateBestAskQty(qty float64) {
-	a.Mu.RLock()
-	defer a.Mu.RUnlock()
-	for _, ch := range a.bestAskQtySubs {
+	for _, ch := range a.BestAskQtySubs {
 		select {
 		case ch <- qty:
 		default:
 			// Subscriber's channel is full or slow, we skip
+		}
+	}
+}
+
+func (a *SubscribableAsset) UpdateTradePrc(prc float64) {
+	for _, ch := range a.TradePrcSubs {
+		select {
+		case ch <- prc:
+		default:
+			// Subscriber's channel is full or slow, we skip
+		}
+	}
+}
+
+func (a *SubscribableAsset) UpdateTradeQty(qty float64) {
+	for _, ch := range a.TradeQtySubs {
+		select {
+		case ch <- qty:
+		default:
+			// Subscriber's channel is full or slow, we skip
+		}
+	}
+}
+
+func (a *SubscribableAsset) Listen() {
+	for {
+		select {
+		case <-a.ctx.Done():
+			return
+		case v := <-a.orderbookChan:
+			log.Println("Orderbook:", v)
+			a.Mu.Lock()
+			a.UpdateBestBidPrc(v[0][0])
+			a.UpdateBestBidQty(v[0][1])
+			a.UpdateBestAskPrc(v[1][0])
+			a.UpdateBestAskQty(v[1][1])
+			a.Mu.Unlock()
+		case v := <-a.tradeChan:
+			a.Mu.Lock()
+			a.UpdateTradePrc(v[0])
+			a.UpdateTradeQty(v[1])
+			a.Mu.Unlock()
 		}
 	}
 }

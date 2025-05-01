@@ -2,6 +2,9 @@ package kimchiarb
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -9,121 +12,254 @@ import (
 	strategybase "cryptoquant.com/m/strategy/base"
 )
 
+// UpbitBinancePair represents a trading pair between Upbit and Binance exchanges.
+// It handles price data streams and calculates premiums between the two markets.
 type UpbitBinancePair struct {
-	Mu           sync.Mutex
-	UpbitAsset   *strategybase.Asset
-	AnchorAsset  *strategybase.Asset // USDTKRW
-	BinanceAsset *strategybase.Asset // Foreign Binance
+	*PairInfo
+	*PairAssetChannels // Embedded Channels
 
-	Premium      float64
-	EnterPremium float64
-	ExitPremium  float64
-	AnchorPrice  float64
+	Mu  sync.Mutex
+	ctx context.Context
 
-	// For more accurate premium calculation
-	BinanceBestBid    float64
-	BinanceBestBidQty float64 // Calculate how much market can take
+	// Premiums represents the price differences between markets
+	EnterPremium float64 // Premium threshold to enter a position
+	ExitPremium  float64 // Premium threshold to exit a position
 
-	BinanceBestAsk    float64
-	BinanceBestAskQty float64 // Calculate how much market can take
+	// Exchange rate - Anchor price (e.g. USDT/KRW rate)
+	anchorPrice float64
 
-	UpbitBestBid    float64
-	UpbitBestBidQty float64 // Calculate how much market can take
+	// Best bid/ask prices and quantities from both exchanges
+	upbitBestBid      float64
+	upbitBestBidQty   float64
+	upbitBestAsk      float64
+	upbitBestAskQty   float64
+	binanceBestBid    float64
+	binanceBestBidQty float64
+	binanceBestAsk    float64
+	binanceBestAskQty float64
 
-	UpbitBestAsk    float64
-	UpbitBestAskQty float64 // Calculate how much market can take
-
-	PremiumChan chan [3]float64 // [EnterPremium, ExitPremium]
+	// Channel for transferring premium data to strategy
+	// Format: [EnterPremium, ExitPremium, AnchorPrice]
+	premiumChan chan [3]float64
 }
 
-func (p *UpbitBinancePair) Run(ctx context.Context) {
+// NewUpbitBinancePair creates a new pair instance with initialized channels
+func NewUpbitBinancePair(ctx context.Context, targetSymbol string, anchorSymbol string) *UpbitBinancePair {
+	channels := NewPairAssetChannels()
+
+	return &UpbitBinancePair{
+		ctx:               ctx,
+		PairAssetChannels: channels,
+		PairInfo: &PairInfo{
+			Symbol: targetSymbol,
+			PairId: fmt.Sprintf("%s_%s_%s_%s", "UPBIT", "BINANCE", strings.ToUpper(anchorSymbol), strings.ToUpper(targetSymbol)),
+		}, // Used for logging purposes
+	}
+}
+
+func (p *UpbitBinancePair) GetExchange1Orderbook() [2][2]float64 {
+	return [2][2]float64{
+		{p.upbitBestBid, p.upbitBestBidQty},
+		{p.upbitBestAsk, p.upbitBestAskQty},
+	}
+}
+
+func (p *UpbitBinancePair) GetExchange2Orderbook() [2][2]float64 {
+	return [2][2]float64{
+		{p.binanceBestBid, p.binanceBestBidQty},
+		{p.binanceBestAsk, p.binanceBestAskQty},
+	}
+}
+
+// SetPremiumChan sets the channel used to send premium updates
+func (p *UpbitBinancePair) SetPremiumChan(ch chan [3]float64) {
+	p.premiumChan = ch
+}
+
+// SubscribeKoreanAsset subscribes to Korean market (Upbit) price feeds
+func (p *UpbitBinancePair) SubscribeKoreanAsset(asset *strategybase.SubscribableAsset) {
+	asset.BestBidPrcSubs[p.PairId] = p.KoreanAssetBestBidPrc
+	asset.BestBidQtySubs[p.PairId] = p.KoreanAssetBestBidQty
+	asset.BestAskPrcSubs[p.PairId] = p.KoreanAssetBestAskPrc
+	asset.BestAskQtySubs[p.PairId] = p.KoreanAssetBestAskQty
+}
+
+// SubscribeForeignAsset subscribes to foreign market (Binance) price feeds
+func (p *UpbitBinancePair) SubscribeForeignAsset(asset *strategybase.SubscribableAsset) {
+	asset.BestBidPrcSubs[p.PairId] = p.ForeignAssetBestBidPrc
+	asset.BestBidQtySubs[p.PairId] = p.ForeignAssetBestBidQty
+	asset.BestAskPrcSubs[p.PairId] = p.ForeignAssetBestAskPrc
+	asset.BestAskQtySubs[p.PairId] = p.ForeignAssetBestAskQty
+}
+
+// SubscribeAnchorPrice subscribes to exchange rate updates
+func (p *UpbitBinancePair) SubscribeAnchorPrice(asset *strategybase.SubscribableAsset) {
+	asset.TradePrcSubs[p.PairId] = p.AnchorPrice
+}
+
+// UnsubscribeKoreanAsset removes subscriptions from Korean market feeds
+func (p *UpbitBinancePair) UnsubscribeKoreanAsset(asset *strategybase.SubscribableAsset) {
+	delete(asset.BestBidPrcSubs, p.PairId)
+	delete(asset.BestBidQtySubs, p.PairId)
+	delete(asset.BestAskPrcSubs, p.PairId)
+	delete(asset.BestAskQtySubs, p.PairId)
+}
+
+// UnsubscribeForeignAsset removes subscriptions from foreign market feeds
+func (p *UpbitBinancePair) UnsubscribeForeignAsset(asset *strategybase.SubscribableAsset) {
+	delete(asset.BestBidPrcSubs, p.PairId)
+	delete(asset.BestBidQtySubs, p.PairId)
+	delete(asset.BestAskPrcSubs, p.PairId)
+	delete(asset.BestAskQtySubs, p.PairId)
+}
+
+// UnsubscribeAnchorPrice removes subscription from exchange rate feed
+func (p *UpbitBinancePair) UnsubscribeAnchorPrice(asset *strategybase.SubscribableAsset) {
+	delete(asset.TradePrcSubs, p.PairId)
+}
+
+// GeneratePremiumLog creates a log entry of current premium state
+func (p *UpbitBinancePair) GeneratePremiumLog() (database.PremiumLog, error) {
+	if p.upbitBestAsk == 0 || p.upbitBestBid == 0 || p.binanceBestBid == 0 || p.binanceBestAsk == 0 || p.anchorPrice == 0 {
+		return database.PremiumLog{}, fmt.Errorf("missing data")
+	}
+	return database.PremiumLog{
+		Timestamp:    time.Now(),
+		Symbol:       p.Symbol,
+		AnchorPrice:  p.anchorPrice,
+		EnterPremium: p.EnterPremium,
+		ExitPremium:  p.ExitPremium,
+	}, nil
+}
+
+// calculatePremiumEnter calculates the premium for entering a position
+// Premium = (Upbit Ask) / (Binance Bid * Exchange Rate)
+func (p *UpbitBinancePair) calculatePremiumEnter() {
+	if p.upbitBestAsk == 0 || p.binanceBestBid == 0 || p.anchorPrice == 0 {
+		return
+	}
+
+	cefiKimchify := p.binanceBestBid * p.anchorPrice
+	kimchiKimchify := p.upbitBestAsk
+	premium := kimchiKimchify / cefiKimchify
+
+	p.EnterPremium = premium
+}
+
+// calculatePremiumExit calculates the premium for exiting a position
+// Premium = (Upbit Bid) / (Binance Ask * Exchange Rate)
+func (p *UpbitBinancePair) calculatePremiumExit() {
+	if p.upbitBestBid == 0 || p.binanceBestAsk == 0 || p.anchorPrice == 0 {
+		return
+	}
+
+	cefiKimchify := p.binanceBestAsk * p.anchorPrice
+	kimchiKimchify := p.upbitBestBid
+	premium := kimchiKimchify / cefiKimchify
+
+	p.ExitPremium = premium
+}
+
+// Run starts the main event loop that processes incoming price updates
+func (p *UpbitBinancePair) Run() {
+	discarded := 0
+	logTicker := time.NewTicker(5 * time.Second)
+	defer logTicker.Stop()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-p.ctx.Done():
 			return
-		case cefibbp := <-p.BinanceAsset.BestBidPrcChan:
+
+		case <-logTicker.C:
+			if discarded > 0 {
+				log.Printf("Discarded %d messages", discarded)
+				discarded = 0
+			}
+
+		case v := <-p.KoreanAssetBestBidPrc:
 			p.Mu.Lock()
-			p.BinanceBestBid = cefibbp
-			p.calculatePremiumEnterPos()
-			p.calculatePremiumExitPos()
+			p.upbitBestBid = v
 			p.Mu.Unlock()
-		case cefibap := <-p.BinanceAsset.BestAskPrcChan:
+
+		case v := <-p.KoreanAssetBestBidQty:
 			p.Mu.Lock()
-			p.BinanceBestAsk = cefibap
-			p.calculatePremiumEnterPos()
-			p.calculatePremiumExitPos()
+			p.upbitBestBidQty = v
 			p.Mu.Unlock()
-		case cefibbq := <-p.BinanceAsset.BestBidQtyChan:
+
+		case v := <-p.KoreanAssetBestAskPrc:
 			p.Mu.Lock()
-			p.BinanceBestBidQty = cefibbq
+			p.upbitBestAsk = v
 			p.Mu.Unlock()
-		case cefibaq := <-p.BinanceAsset.BestAskQtyChan:
+
+		case v := <-p.KoreanAssetBestAskQty:
 			p.Mu.Lock()
-			p.BinanceBestAskQty = cefibaq
+			p.upbitBestAskQty = v
 			p.Mu.Unlock()
-		// Kimchi
-		case kimchiBestBid := <-p.UpbitAsset.BestBidPrcChan:
+
+		case v := <-p.AnchorPrice:
 			p.Mu.Lock()
-			p.UpbitBestBid = kimchiBestBid
-			p.calculatePremiumEnterPos()
-			p.calculatePremiumExitPos()
+			p.anchorPrice = v
 			p.Mu.Unlock()
-		case kimchiBestAsk := <-p.UpbitAsset.BestAskPrcChan:
+
+		case v := <-p.ForeignAssetBestBidPrc:
 			p.Mu.Lock()
-			p.UpbitBestAsk = kimchiBestAsk
-			p.calculatePremiumEnterPos()
+			p.binanceBestBid = v
 			p.Mu.Unlock()
-		case kimchiBestBidQty := <-p.UpbitAsset.BestBidQtyChan:
+
+		case v := <-p.ForeignAssetBestBidQty:
 			p.Mu.Lock()
-			p.UpbitBestBidQty = kimchiBestBidQty
+			p.binanceBestBidQty = v
 			p.Mu.Unlock()
-		case kimchiBestAskQty := <-p.UpbitAsset.BestAskQtyChan:
+
+		case v := <-p.ForeignAssetBestAskPrc:
 			p.Mu.Lock()
-			p.UpbitBestAskQty = kimchiBestAskQty
+			p.binanceBestAsk = v
+			p.Mu.Unlock()
+
+		case v := <-p.ForeignAssetBestAskQty:
+			p.Mu.Lock()
+			p.binanceBestAskQty = v
 			p.Mu.Unlock()
 		}
 
 		// Check for correct data input
-		if p.UpbitBestBid == 0 || p.UpbitBestAsk == 0 || p.BinanceBestBid == 0 || p.BinanceBestAsk == 0 || p.AnchorPrice == 0 {
+		if p.upbitBestAsk == 0 || p.upbitBestBid == 0 || p.binanceBestBid == 0 || p.binanceBestAsk == 0 || p.anchorPrice == 0 {
 			continue
 		}
 
-		p.PremiumChan <- [3]float64{p.EnterPremium, p.ExitPremium, p.AnchorPrice}
+		// Calculate premiums if ready
+		p.calculatePremiumEnter()
+		p.calculatePremiumExit()
+
+		select {
+		case p.premiumChan <- [3]float64{p.EnterPremium, p.ExitPremium, p.anchorPrice}:
+		default:
+			discarded++
+		}
 	}
 }
 
-func (p *UpbitBinancePair) ToPremiumLog() database.PremiumLog {
+// Close cleans up resources by closing channels and resetting state
+func (p *UpbitBinancePair) Close() {
 	p.Mu.Lock()
 	defer p.Mu.Unlock()
-	return database.PremiumLog{
-		Timestamp:     time.Now(),
-		Symbol:        p.UpbitAsset.Symbol,
-		AnchorPrice:   p.AnchorPrice,
-		KimchiBestBid: p.UpbitBestBid,
-		KimchiBestAsk: p.UpbitBestAsk,
-		CefiBestBid:   p.BinanceBestBid,
-		CefiBestAsk:   p.BinanceBestAsk,
-	}
-}
 
-func (p *UpbitBinancePair) calculatePremiumEnterPos() {
-	if p.UpbitBestAsk == 0 || p.BinanceBestBid == 0 || p.AnchorPrice == 0 {
-		return
-	}
+	// Close internal channels
+	close(p.KoreanAssetBestBidPrc)
+	close(p.KoreanAssetBestBidQty)
+	close(p.KoreanAssetBestAskPrc)
+	close(p.KoreanAssetBestAskQty)
 
-	cefiKimchify := p.BinanceBestBid * p.AnchorPrice
-	kimchiKimchify := p.UpbitBestAsk
-	premium := kimchiKimchify / cefiKimchify
-	p.EnterPremium = premium
-}
+	close(p.ForeignAssetBestBidPrc)
+	close(p.ForeignAssetBestBidQty)
+	close(p.ForeignAssetBestAskPrc)
+	close(p.ForeignAssetBestAskQty)
 
-func (p *UpbitBinancePair) calculatePremiumExitPos() {
-	if p.UpbitBestBid == 0 || p.BinanceBestAsk == 0 || p.AnchorPrice == 0 {
-		return
-	}
+	close(p.AnchorPrice)
 
-	cefiKimchify := p.BinanceBestAsk * p.AnchorPrice
-	kimchiKimchify := p.UpbitBestBid
-	premium := kimchiKimchify / cefiKimchify
-	p.ExitPremium = premium
+	// (premiumChan is passed externally, maybe don't close here — or optionally close if you own it.)
+
+	// Clear premium calculation numbers
+	p.EnterPremium = 0
+	p.ExitPremium = 0
 }

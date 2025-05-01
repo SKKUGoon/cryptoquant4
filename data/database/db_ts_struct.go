@@ -9,13 +9,9 @@ type PremiumLog struct {
 	ExchangePremium string // Upbit, Bithumb etc
 
 	// Best Bid and Ask
-	KimchiBestBid float64
-	KimchiBestAsk float64
-	CefiBestBid   float64
-	CefiBestAsk   float64
-
-	// Anchor Price (USDT)
-	AnchorPrice float64
+	EnterPremium float64
+	ExitPremium  float64
+	AnchorPrice  float64
 }
 
 type KimchiOrderLog struct {
