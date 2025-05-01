@@ -157,21 +157,8 @@ func ExtractQuantity(trade upbitws.SpotTrade) float64 {
 	return trade.TradeVolume
 }
 
-// Best ask and bid price and quantity at execution period.
-func ExtractExecBestBidPrc(trade upbitws.SpotTrade) float64 {
-	return trade.BestBidPrice
-}
-
-func ExtractExecBestBidQty(trade upbitws.SpotTrade) float64 {
-	return trade.BestBidSize
-}
-
-func ExtractExecBestAskPrc(trade upbitws.SpotTrade) float64 {
-	return trade.BestAskPrice
-}
-
-func ExtractExecBestAskQty(trade upbitws.SpotTrade) float64 {
-	return trade.BestAskSize
+func ExtractTrade(trade upbitws.SpotTrade) [2]float64 {
+	return [2]float64{trade.TradePrice, trade.TradeVolume}
 }
 
 func NewPriceHandler(ch chan float64) func(upbitws.SpotTrade) error {
@@ -182,18 +169,6 @@ func NewQuantityHandler(ch chan float64) func(upbitws.SpotTrade) error {
 	return HandlerTrade(ch, ExtractQuantity, nil)
 }
 
-func NewExecBestBidPrcHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestBidPrc, nil)
-}
-
-func NewExecBestBidQtyHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestBidQty, nil)
-}
-
-func NewExecBestAskPrcHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestAskPrc, nil)
-}
-
-func NewExecBestAskQtyHandler(ch chan float64) func(upbitws.SpotTrade) error {
-	return HandlerTrade(ch, ExtractExecBestAskQty, nil)
+func NewTradeHandler(ch chan [2]float64) func(upbitws.SpotTrade) error {
+	return HandlerTrade(ch, ExtractTrade, nil)
 }

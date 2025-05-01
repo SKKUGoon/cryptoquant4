@@ -138,34 +138,45 @@ func HandlerBook[T any, V any](
 	}
 }
 
-func ExtractBestBidPrc(orderbook upbitws.SpotOrderbook) float64 {
-	return orderbook.OrderbookUnits[0].BidPrice
+func ExtractOrderbook(orderbook upbitws.SpotOrderbook) [2][2]float64 {
+	return [2][2]float64{
+		{orderbook.OrderbookUnits[0].BidPrice, orderbook.OrderbookUnits[0].BidSize},
+		{orderbook.OrderbookUnits[0].AskPrice, orderbook.OrderbookUnits[0].AskSize},
+	}
 }
 
-func ExtractBestBidQty(orderbook upbitws.SpotOrderbook) float64 {
-	return orderbook.OrderbookUnits[0].BidSize
+func NewOrderbookHandler(ch chan [2][2]float64) func(upbitws.SpotOrderbook) error {
+	return HandlerBook(ch, ExtractOrderbook, nil)
 }
 
-func ExtractBestAskPrc(orderbook upbitws.SpotOrderbook) float64 {
-	return orderbook.OrderbookUnits[0].AskPrice
-}
+// func ExtractBestBidPrc(orderbook upbitws.SpotOrderbook) float64 {
+// 	return orderbook.OrderbookUnits[0].BidPrice
+// }
 
-func ExtractBestAskQty(orderbook upbitws.SpotOrderbook) float64 {
-	return orderbook.OrderbookUnits[0].AskSize
-}
+// func ExtractBestBidQty(orderbook upbitws.SpotOrderbook) float64 {
+// 	return orderbook.OrderbookUnits[0].BidSize
+// }
 
-func NewBestBidPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
-	return HandlerBook(ch, ExtractBestBidPrc, nil)
-}
+// func ExtractBestAskPrc(orderbook upbitws.SpotOrderbook) float64 {
+// 	return orderbook.OrderbookUnits[0].AskPrice
+// }
 
-func NewBestBidQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
-	return HandlerBook(ch, ExtractBestBidQty, nil)
-}
+// func ExtractBestAskQty(orderbook upbitws.SpotOrderbook) float64 {
+// 	return orderbook.OrderbookUnits[0].AskSize
+// }
 
-func NewBestAskPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
-	return HandlerBook(ch, ExtractBestAskPrc, nil)
-}
+// func NewBestBidPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+// 	return HandlerBook(ch, ExtractBestBidPrc, nil)
+// }
 
-func NewBestAskQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
-	return HandlerBook(ch, ExtractBestAskQty, nil)
-}
+// func NewBestBidQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+// 	return HandlerBook(ch, ExtractBestBidQty, nil)
+// }
+
+// func NewBestAskPrcHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+// 	return HandlerBook(ch, ExtractBestAskPrc, nil)
+// }
+
+// func NewBestAskQtyHandler(ch chan float64) func(upbitws.SpotOrderbook) error {
+// 	return HandlerBook(ch, ExtractBestAskQty, nil)
+// }

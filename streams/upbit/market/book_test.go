@@ -11,8 +11,8 @@ import (
 
 func TestSubscribeBook(t *testing.T) {
 	t.Log("Starting Stream KRW-BTC")
-	ch := make(chan float64)
-	handler := upbitmarket.NewBestBidPrcHandler(ch)
+	ch := make(chan [2][2]float64)
+	handler := upbitmarket.NewOrderbookHandler(ch)
 	handlers := []func(upbitws.SpotOrderbook) error{handler}
 	ctx, cancel := context.WithCancel(context.Background())
 	go upbitmarket.SubscribeBook(ctx, "KRW-BTC", handlers)

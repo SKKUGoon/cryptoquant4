@@ -11,8 +11,8 @@ import (
 
 func TestSubscribeTrade(t *testing.T) {
 	t.Log("Starting Stream KRW-BTC")
-	ch := make(chan float64)
-	handler := upbitmarket.NewPriceHandler(ch)
+	ch := make(chan [2]float64)
+	handler := upbitmarket.NewTradeHandler(ch)
 	handlers := []func(upbitws.SpotTrade) error{handler}
 	ctx, cancel := context.WithCancel(context.Background())
 	go upbitmarket.SubscribeTrade(ctx, "KRW-BTC", handlers)

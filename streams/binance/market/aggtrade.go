@@ -88,6 +88,10 @@ func ExtractQuantity(trade binancews.FutureAggTrade) string {
 	return trade.Quantity
 }
 
+func ExtractTrade(trade binancews.FutureAggTrade) [2]float64 {
+	return [2]float64{utils.StringToFloat64(trade.Price), utils.StringToFloat64(trade.Quantity)}
+}
+
 // Helper functions for common use cases
 func NewPriceHandler(ch chan float64) func(binancews.FutureAggTrade) error {
 	return HandlerAggtrade(ch, ExtractPrice, utils.StringToFloat64)
@@ -99,6 +103,10 @@ func NewSymbolHandler(ch chan string) func(binancews.FutureAggTrade) error {
 
 func NewQuantityHandler(ch chan float64) func(binancews.FutureAggTrade) error {
 	return HandlerAggtrade(ch, ExtractQuantity, utils.StringToFloat64)
+}
+
+func NewTradeHandler(ch chan [2]float64) func(binancews.FutureAggTrade) error {
+	return HandlerAggtrade(ch, ExtractTrade, nil)
 }
 
 // Example usage:

@@ -76,34 +76,13 @@ func HandlerBook[T any, V any](
 	}
 }
 
-func ExtractBestAskPrice(book binancews.FutureBookTicker) string {
-	return book.BestAskPrice
+func ExtractOrderbook(book binancews.FutureBookTicker) [2][2]float64 {
+	return [2][2]float64{
+		{utils.StringToFloat64(book.BestBidPrice), utils.StringToFloat64(book.BestBidQty)},
+		{utils.StringToFloat64(book.BestAskPrice), utils.StringToFloat64(book.BestAskQty)},
+	}
 }
 
-func ExtractBestBidPrice(book binancews.FutureBookTicker) string {
-	return book.BestBidPrice
-}
-
-func ExtractBestAskQty(book binancews.FutureBookTicker) string {
-	return book.BestAskQty
-}
-
-func ExtractBestBidQty(book binancews.FutureBookTicker) string {
-	return book.BestBidQty
-}
-
-func NewBestAskPrcHandler(ch chan float64) func(binancews.FutureBookTicker) error {
-	return HandlerBook(ch, ExtractBestAskPrice, utils.StringToFloat64)
-}
-
-func NewBestBidPrcHandler(ch chan float64) func(binancews.FutureBookTicker) error {
-	return HandlerBook(ch, ExtractBestBidPrice, utils.StringToFloat64)
-}
-
-func NewBestAskQtyHandler(ch chan float64) func(binancews.FutureBookTicker) error {
-	return HandlerBook(ch, ExtractBestAskQty, utils.StringToFloat64)
-}
-
-func NewBestBidQtyHandler(ch chan float64) func(binancews.FutureBookTicker) error {
-	return HandlerBook(ch, ExtractBestBidQty, utils.StringToFloat64)
+func NewOrderbookHandler(ch chan [2][2]float64) func(binancews.FutureBookTicker) error {
+	return HandlerBook(ch, ExtractOrderbook, nil)
 }

@@ -11,15 +11,9 @@ import (
 
 func TestSubscribeBook(t *testing.T) {
 	t.Log("Starting Stream BTCUSDT")
-	ch1 := make(chan float64)
-	ch2 := make(chan float64)
-	ch3 := make(chan float64)
-	ch4 := make(chan float64)
-	handler1 := binancemarket.NewBestBidPrcHandler(ch1)
-	handler2 := binancemarket.NewBestAskPrcHandler(ch2)
-	handler3 := binancemarket.NewBestBidQtyHandler(ch3)
-	handler4 := binancemarket.NewBestAskQtyHandler(ch4)
-	handlers := []func(binancews.FutureBookTicker) error{handler1, handler2, handler3, handler4}
+	ch1 := make(chan [2][2]float64)
+	handler1 := binancemarket.NewOrderbookHandler(ch1)
+	handlers := []func(binancews.FutureBookTicker) error{handler1}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -31,9 +25,6 @@ func TestSubscribeBook(t *testing.T) {
 	go func() {
 		defer close(done)
 		defer close(ch1)
-		defer close(ch2)
-		defer close(ch3)
-		defer close(ch4)
 
 		timeout := time.After(10 * time.Second)
 		received := make(map[string]bool)
@@ -46,32 +37,8 @@ func TestSubscribeBook(t *testing.T) {
 				if !ok {
 					return
 				}
-				t.Log("Best Bid Price:", price)
-				received["bid_price"] = true
-			case price, ok := <-ch2:
-				if !ok {
-					return
-				}
-				t.Log("Best Ask Price:", price)
-				received["ask_price"] = true
-			case qty, ok := <-ch3:
-				if !ok {
-					return
-				}
-				t.Log("Best Bid Qty:", qty)
-				received["bid_qty"] = true
-			case qty, ok := <-ch4:
-				if !ok {
-					return
-				}
-				t.Log("Best Ask Qty:", qty)
-				received["ask_qty"] = true
-			}
-
-			// Check if we've received at least one of each type
-			if received["bid_price"] && received["ask_price"] &&
-				received["bid_qty"] && received["ask_qty"] {
-				return
+				t.Log("Orderbook:", price)
+				received["orderbook"] = true
 			}
 		}
 	}()
