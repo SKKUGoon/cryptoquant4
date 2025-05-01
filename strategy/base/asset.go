@@ -30,9 +30,7 @@ func NewSubscribableAsset(ctx context.Context, symbol string) *SubscribableAsset
 	return &SubscribableAsset{
 		ctx:    ctx,
 		Symbol: symbol,
-		// Streams
-		orderbookChan: make(chan [2][2]float64, 100), // 100 is the buffer size. More tolorance for bursts
-		tradeChan:     make(chan [2]float64, 100),
+
 		// Subscribers
 		BestBidPrcSubs: make(map[string]chan float64),
 		BestBidQtySubs: make(map[string]chan float64),
@@ -138,7 +136,6 @@ func (a *SubscribableAsset) Listen() {
 		case <-a.ctx.Done():
 			return
 		case v := <-a.orderbookChan:
-			log.Println("Orderbook:", v)
 			a.Mu.Lock()
 			a.UpdateBestBidPrc(v[0][0])
 			a.UpdateBestBidQty(v[0][1])
